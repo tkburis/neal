@@ -1,13 +1,14 @@
 mod token;
-mod scanner;
+mod tokenizer;
 mod error;
 
-use core::ascii;
 use std::env;
 use std::io;
 use std::io::Write;
 use std::process;
 use std::fs;
+
+use error::ErrorType;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -37,9 +38,9 @@ fn run_prompt() {
     }
 }
 
-fn run(source: &str) -> Result<(), ()> {
-    let mut scanner = scanner::Scanner::new(source);
-    let tokens = scanner.scan_tokens()?;
+fn run(source: &str) -> Result<(), ErrorType> {
+    let mut tokenizer = tokenizer::Tokenizer::new(source);
+    let tokens = tokenizer.tokenize()?;
     println!("{:?}", tokens);
     Ok(())
 }

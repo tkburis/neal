@@ -1,14 +1,14 @@
 use crate::{token::{Token, TokenType, Literal}, error::{self, ErrorType}};
 
-pub struct Scanner<'a> {
+pub struct Tokenizer<'a> {
     source: &'a str,  // Source code.
-    tokens: Vec<Token>,  // Tokens that have been scanned from source code.
+    tokens: Vec<Token>,  // Tokens that have been tokenized from source code.
     start: usize,  // Points to the start of the current token.
     current: usize,  // Points to the *next* character to be scanned.
     line: usize,  // Keeps track of the current line number.
 }
 
-impl<'a> Scanner<'a> {
+impl<'a> Tokenizer<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
@@ -21,7 +21,7 @@ impl<'a> Scanner<'a> {
 
     /// Interface function.
     /// Returns a vector of tokens if no error had taken place. Otherwise, returns `Err(())`
-    pub fn scan_tokens(&mut self) -> Result<Vec<Token>, ()> {
+    pub fn tokenize(&mut self) -> Result<Vec<Token>, ErrorType> {
         while !self.is_at_end() {
             // Keep scanning until we reach the end of the file.
             self.start = self.current;  // Update the start of the current token to the current character.
@@ -39,7 +39,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Attempts to build a token from the current character(s) in the source code.
-    fn scan_token(&mut self) -> Result<(), ()> {
+    fn scan_token(&mut self) -> Result<(), ErrorType> {
         let c = self.advance()?;
 
         match c {
@@ -110,11 +110,10 @@ impl<'a> Scanner<'a> {
 
             other => {
                 // If the character does not match any of the above rules, raise an error.
-                error::report(ErrorType::UnexpectedCharacter {
+                return Err(error::report(ErrorType::UnexpectedCharacter {
                     character: other,
                     line: self.line,
-                });
-                return Err(());
+                }));
             },
         };
 
@@ -122,7 +121,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Processes string literals.
-    fn string(&mut self) -> Result<(), ()> {
+    fn string(&mut self) -> Result<(), ErrorType> {
         while self.peek() != Some('"') && !self.is_at_end() {
             // Keep advancing until we reach the end of the file or a `"`.
             if self.advance()? == '\n' {
@@ -132,8 +131,7 @@ impl<'a> Scanner<'a> {
 
         if self.is_at_end() {
             // We have reached the end and there was no closing `"`.
-            error::report(ErrorType::UnterminatedString);
-            return Err(());
+            return Err(error::report(ErrorType::UnterminatedString));
         } else {
             // Consume the closing `"`.
             self.advance()?;
@@ -145,7 +143,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Processes number literals.
-    fn number(&mut self) -> Result<(), ()> {
+    fn number(&mut self) -> Result<(), ErrorType> {
         while self.peek().map_or(false, |c| c.is_ascii_digit()) {
             // The above statement evaluates to `false` if `peek()` returned `None`. Otherwise, it will evaluate to the result of the closure.
             self.advance()?;
@@ -168,7 +166,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Processes identifiers and keywords.
-    fn word(&mut self) -> Result<(), ()> {
+    fn word(&mut self) -> Result<(), ErrorType> {
         while self.peek().map_or(false, |c| c.is_ascii_alphanumeric() || c == '_') {
             // Allow alphanumeric characters and `_` in identifiers.
             self.advance()?;
@@ -200,7 +198,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Consumes and returns the next character pointed to by `current`.
-    fn advance(&mut self) -> Result<char, ()> {
+    fn advance(&mut self) -> Result<char, ErrorType> {
         match self.source.chars().nth(self.current) {
             Some(c) => {
                 self.current += 1;
@@ -208,14 +206,13 @@ impl<'a> Scanner<'a> {
             },
             None => {
                 // Somehow `current` points to something after the end. Bubble up an error.
-                error::report(ErrorType::UnexpectedEof);
-                Err(())
+                Err(error::report(ErrorType::UnexpectedEof))
             },
         }
     }
 
     /// Checks if next character pointed to by `current` is `expected`. If so, consume it and return true.
-    fn match_next(&mut self, expected: char) -> Result<bool, ()> {
+    fn match_next(&mut self, expected: char) -> Result<bool, ErrorType> {
         match self.source.chars().nth(self.current) {
             Some(c) => {
                 if expected == c {
@@ -227,8 +224,7 @@ impl<'a> Scanner<'a> {
             },
             None => {
                 // Somehow `current` points to something after the end. Bubble up an error.
-                error::report(ErrorType::UnexpectedEof);
-                Err(())
+                Err(error::report(ErrorType::UnexpectedEof))
             },
         }
     }
@@ -264,8 +260,90 @@ impl<'a> Scanner<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     #[test]
+#[cfg(test)]
+mod tests {
+    use crate::{token::{Token, TokenType, Literal}, error::ErrorType};
 
-// }
+    use super::Tokenizer;
+
+    fn tokenize(source: &str) -> Result<Vec<Token>, ErrorType> {
+        let mut tokenizer = Tokenizer::new(source);
+        tokenizer.tokenize()
+    }
+
+    #[test]
+    fn one_char_tokens() {
+        let source = "( ) { } [ ] , . - + ; / *";
+        assert_eq!(Ok(vec![
+            Token { type_: TokenType::LeftParen, lexeme: String::from("("), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::RightParen, lexeme: String::from(")"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::LeftCurly, lexeme: String::from("{"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::RightCurly, lexeme: String::from("}"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::LeftSquare, lexeme: String::from("["), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::RightSquare, lexeme: String::from("]"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Comma, lexeme: String::from(","), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Dot, lexeme: String::from("."), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Minus, lexeme: String::from("-"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Plus, lexeme: String::from("+"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Semicolon, lexeme: String::from(";"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Slash, lexeme: String::from("/"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Star, lexeme: String::from("*"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
+        ]), tokenize(source));
+    }
+
+    #[test]
+    fn one_two_char_tokens() {
+        let source = "! != = == > >= < <=";
+        assert_eq!(Ok(vec![
+            Token { type_: TokenType::Bang, lexeme: String::from("!"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::BangEqual, lexeme: String::from("!="), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Equal, lexeme: String::from("="), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::EqualEqual, lexeme: String::from("=="), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Greater, lexeme: String::from(">"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::GreaterEqual, lexeme: String::from(">="), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Less, lexeme: String::from("<"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::LessEqual, lexeme: String::from("<="), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
+        ]), tokenize(source));
+    }
+
+    #[test]
+    fn literals() {
+        let source = "\"abc\" 123 \"abc123\" 123.5 \"\"";
+        assert_eq!(Ok(vec![
+            Token { type_: TokenType::String_, lexeme: String::from("\"abc\""), literal: Literal::String_(String::from("abc")), line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("123"), literal: Literal::Number(123.0), line: 1 },
+            Token { type_: TokenType::String_, lexeme: String::from("\"abc123\""), literal: Literal::String_(String::from("abc123")), line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("123.5"), literal: Literal::Number(123.5), line: 1 },
+            Token { type_: TokenType::String_, lexeme: String::from("\"\""), literal: Literal::String_(String::from("")), line: 1 },
+            Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
+        ]), tokenize(source));
+    }
+
+    #[test]
+    fn line_count() {
+        let source = "12\n23";
+        assert_eq!(Ok(vec![
+            Token { type_: TokenType::Number, lexeme: String::from("12"), literal: Literal::Number(12.0), line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("23"), literal: Literal::Number(23.0), line: 2 },
+            Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 2 },
+        ]), tokenize(source));
+    }
+
+    #[test]
+    fn unterminated_string() {
+        let source = "\"abc\nabc\nabc";
+        assert_eq!(Err(ErrorType::UnterminatedString), tokenize(source));
+    }
+
+    #[test]
+    fn identifiers() {
+        let source = "a a2";
+        assert_eq!(Ok(vec![
+            Token { type_: TokenType::Identifier, lexeme: String::from("a"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Identifier, lexeme: String::from("a2"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
+        ]), tokenize(source));
+    }
+}

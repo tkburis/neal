@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen, RightParen,
@@ -23,7 +23,7 @@ pub enum TokenType {
 }
 
 /// `Literal` represents 'front-end' values from the source code.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
     Number(f64),
     String_(String),
@@ -38,10 +38,10 @@ pub enum Value {
     Null,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     pub type_: TokenType,  // Type of token.
     pub lexeme: String,  // The 'original' from the source code.
     pub literal: Literal,  // The literal value (number/string/null if N/A) the token represents.
-    pub line: usize,  // The line number the token was scanned from.
+    pub line: usize,  // The line number the token was present in.
 }

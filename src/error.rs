@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub enum ErrorType {
     UnexpectedEof,
     UnexpectedCharacter {
@@ -7,7 +8,7 @@ pub enum ErrorType {
     UnterminatedString,
 }
 
-pub fn report(type_: ErrorType) {
+pub fn report(type_: ErrorType) -> ErrorType {
     match type_ {
         ErrorType::UnexpectedEof => {
             println!("Unexpected end of file.")
@@ -16,7 +17,8 @@ pub fn report(type_: ErrorType) {
             println!("Unexpected character: {0} on line {1}.", &character.to_string(), &line.to_string())
         },
         ErrorType::UnterminatedString => {
-            println!("Unterminated string.")
+            println!("Unterminated string at end of file.")
         }
     }
+    type_
 }
