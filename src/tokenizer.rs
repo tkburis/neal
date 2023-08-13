@@ -1,10 +1,44 @@
 use crate::{token::{Token, TokenType, Literal}, error::{self, ErrorType}};
 
+#[derive(Debug)]
+enum State {
+    Start,
+    GotLeftParen,
+    GotRightParen,
+    GotLeftCurly,
+    GotRightCurly,
+    GotLeftSquare,
+    GotRightSquare,
+    GotComma,
+    GotDot,
+    GotMinus,
+    GotPlus,
+    GotSemicolon,
+    GotSlash,
+    GotStar,
+    InComment,
+    GotBang,
+    GotBangEqual,
+    GotEqual,
+    GotEqualEqual,
+    GotGreater,
+    GotGreaterEqual,
+    GotLess,
+    GotLessEqual,
+    InString,
+    GotString,
+    InNumberBeforeDot,
+    InNumberAfterDot,
+    InWord,  // Identifiers and keywords.
+    NoOp,
+}
+
 pub struct Tokenizer<'a> {
     source: &'a str,  // Source code.
     tokens: Vec<Token>,  // Tokens that have been tokenized from source code.
     start: usize,  // Points to the start of the current token.
-    current: usize,  // Points to the *next* character to be scanned.
+    current_index: usize,  // Points to the *next* character to be scanned.
+    current_state: State,  // The current state of the finite automaton.
     line: usize,  // Keeps track of the current line number.
 }
 
@@ -14,18 +48,20 @@ impl<'a> Tokenizer<'a> {
             source,
             tokens: Vec::new(),
             start: 0,
-            current: 0,
+            current_index: 0,
+            current_state: State::Start,
             line: 1,
         }
     }
 
     /// Interface function.
-    /// Returns a vector of tokens if no error had taken place. Otherwise, returns `Err(())`
+    /// Returns a vector of tokens if no error had taken place. Otherwise, returns `Err(())`.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, ErrorType> {
-        while !self.is_at_end() {
-            // Keep scanning until we reach the end of the file.
-            self.start = self.current;  // Update the start of the current token to the current character.
-            self.scan_token()?;
+        while self.source.chars().nth(self.current_index).is_some() {
+            match self.scan_token()? {
+                Some(token) => self.tokens.push(token),
+                None => ()
+            }
         }
 
         self.tokens.push(Token {
@@ -38,225 +74,222 @@ impl<'a> Tokenizer<'a> {
         Ok(self.tokens.clone())
     }
 
-    /// Attempts to build a token from the current character(s) in the source code.
-    fn scan_token(&mut self) -> Result<(), ErrorType> {
-        let c = self.advance()?;
+    fn scan_token(&mut self) -> Result<Option<Token>, ErrorType> {
+        self.current_state = State::Start;
+        
+        loop {
+            let current_char_opt = self.source.chars().nth(self.current_index);
+            match self.current_state {
+                State::Start => {
+                    self.start = self.current_index;  // The next token starts here.
+                    if let Some(current_char) = current_char_opt {
+                        match current_char {
+                            '(' => self.current_state = State::GotLeftParen,
+                            ')' => self.current_state = State::GotRightParen,
+                            '{' => self.current_state = State::GotLeftCurly,
+                            '}' => self.current_state = State::GotRightCurly,
+                            '[' => self.current_state = State::GotLeftSquare,
+                            ']' => self.current_state = State::GotRightSquare,
+                            ',' => self.current_state = State::GotComma,
+                            '.' => self.current_state = State::GotDot,
+                            '-' => self.current_state = State::GotMinus,
+                            '+' => self.current_state = State::GotPlus,
+                            ';' => self.current_state = State::GotSemicolon,
+                            '/' => self.current_state = State::GotSlash,
+                            '*' => self.current_state = State::GotStar,
+    
+                            '#' => self.current_state = State::InComment,
+    
+                            // We have to see the next character to be able to correctly identify the token.
+                            '!' => self.current_state = State::GotBang,
+                            '=' => self.current_state = State::GotEqual,
+                            '>' => self.current_state = State::GotGreater,
+                            '<' => self.current_state = State::GotLess,
+    
+                            // Literals.
+                            '"' => self.current_state = State::InString,
+                            '0'..='9' => self.current_state = State::InNumberBeforeDot,
+    
+                            // Identifiers and keywords.
+                            'a'..='z' | 'A'..='Z' | '_' => self.current_state = State::InWord,
+    
+                            // Whitespace.
+                            ' ' | '\r' | '\t' => self.current_state = State::NoOp,
+    
+                            '\n' => {
+                                self.line += 1;
+                                self.current_state = State::NoOp;
+                            },
+    
+                            other => {
+                                // If the character does not match any of the above rules, raise an error.
+                                return Err(error::report(ErrorType::UnexpectedCharacter {
+                                    character: other,
+                                    line: self.line,
+                                }));
+                            },
+                        }
+                    } else {
+                        self.current_state = State::NoOp;
+                    }
+                },
 
-        match c {
-            // Single-character tokens.
-            '(' => self.add_token(TokenType::LeftParen),
-            ')' => self.add_token(TokenType::RightParen),
-            '{' => self.add_token(TokenType::LeftCurly),
-            '}' => self.add_token(TokenType::RightCurly),
-            '[' => self.add_token(TokenType::LeftSquare),
-            ']' => self.add_token(TokenType::RightSquare),
-            ',' => self.add_token(TokenType::Comma),
-            '.' => self.add_token(TokenType::Dot),
-            '-' => self.add_token(TokenType::Minus),
-            '+' => self.add_token(TokenType::Plus),
-            ';' => self.add_token(TokenType::Semicolon),
-            '/' => self.add_token(TokenType::Slash),
-            '*' => self.add_token(TokenType::Star),
+                State::GotLeftParen => return Ok(Some(self.construct_token(TokenType::LeftParen))),
+                State::GotRightParen => return Ok(Some(self.construct_token(TokenType::RightParen))),
+                State::GotLeftCurly => return Ok(Some(self.construct_token(TokenType::LeftCurly))),
+                State::GotRightCurly => return Ok(Some(self.construct_token(TokenType::RightCurly))),
+                State::GotLeftSquare => return Ok(Some(self.construct_token(TokenType::LeftSquare))),
+                State::GotRightSquare => return Ok(Some(self.construct_token(TokenType::RightSquare))),
+                State::GotComma => return Ok(Some(self.construct_token(TokenType::Comma))),
+                State::GotDot => return Ok(Some(self.construct_token(TokenType::Dot))),
+                State::GotMinus => return Ok(Some(self.construct_token(TokenType::Minus))),
+                State::GotPlus => return Ok(Some(self.construct_token(TokenType::Plus))),
+                State::GotSemicolon => return Ok(Some(self.construct_token(TokenType::Semicolon))),
+                State::GotSlash => return Ok(Some(self.construct_token(TokenType::Slash))),
+                State::GotStar => return Ok(Some(self.construct_token(TokenType::Star))),
 
-            // One or two character tokens. The next character has to be taken into consideration through `peek()`.
-            '#' => {
-                while self.peek() != Some('\n') {
-                    // It is a comment. Ignore all characters until the end of the line.
-                    self.advance()?;
-                }
-            },
-            
-            '!' => {
-                if self.match_next('=')? {
-                    self.add_token(TokenType::BangEqual)
-                } else {
-                    self.add_token(TokenType::Bang)
-                }
-            },
-            '=' => {
-                if self.match_next('=')? {
-                    self.add_token(TokenType::EqualEqual)
-                } else {
-                    self.add_token(TokenType::Equal)
-                }
-            },
-            '>' => {
-                if self.match_next('=')? {
-                    self.add_token(TokenType::GreaterEqual)
-                } else {
-                    self.add_token(TokenType::Greater)
-                }
-            },
-            '<' => {
-                if self.match_next('=')? {
-                    self.add_token(TokenType::LessEqual)
-                } else {
-                    self.add_token(TokenType::Less)
-                }
-            },
+                State::InComment => {
+                    // If we have a new line or we have reached the end of the file, the comment has ended.
+                    if current_char_opt == Some('\n') || current_char_opt.is_none() {
+                        return Ok(None);
+                    }
+                },
 
-            // Literals.
-            '"' => self.string()?,
-            '0'..='9' => self.number()?,
+                State::GotBang => {
+                    if current_char_opt == Some('=') {
+                        self.current_state = State::GotBangEqual;
+                    } else {
+                        // If the character isn't `=` or we are at the end, just make `Bang` token.
+                        return Ok(Some(self.construct_token(TokenType::Bang)));
+                    }
+                },
+                State::GotEqual => {
+                    if current_char_opt == Some('=') {
+                        self.current_state = State::GotEqualEqual;
+                    } else {
+                        return Ok(Some(self.construct_token(TokenType::Equal)));
+                    }
+                },
+                State::GotGreater => {
+                    if current_char_opt == Some('=') {
+                        self.current_state = State::GotGreaterEqual;
+                    } else {
+                        return Ok(Some(self.construct_token(TokenType::Greater)));
+                    }
+                },
+                State::GotLess => {
+                    if current_char_opt == Some('=') {
+                        self.current_state = State::GotLessEqual;
+                    } else {
+                        return Ok(Some(self.construct_token(TokenType::Less)));
+                    }
+                },
+                
+                State::GotBangEqual => return Ok(Some(self.construct_token(TokenType::BangEqual))),
+                State::GotEqualEqual => return Ok(Some(self.construct_token(TokenType::EqualEqual))),
+                State::GotGreaterEqual => return Ok(Some(self.construct_token(TokenType::GreaterEqual))),
+                State::GotLessEqual => return Ok(Some(self.construct_token(TokenType::LessEqual))),
+                
+                State::InString => {
+                    if current_char_opt == Some('"') {
+                        self.current_state = State::GotString;
+                    } else if current_char_opt.is_none() {
+                        // We have reached the end and there was no closing `"`.
+                        return Err(error::report(ErrorType::UnterminatedString));
+                    }
+                },
+                State::GotString => {
+                    return Ok(Some(self.construct_token_with_literal(
+                        TokenType::String_,
+                        Literal::String_(self.source[self.start+1..self.current_index-1].to_owned())
+                    )));
+                },
 
-            // Identifiers or keywords.
-            'a'..='z' | 'A'..='Z' | '_' => self.word()?,
+                State::InNumberBeforeDot => {
+                    match current_char_opt {
+                        Some(current_char) => {
+                            if current_char == '.' {
+                                self.current_state = State::InNumberAfterDot;
+                            } else if !current_char.is_ascii_digit() {
+                                return Ok(Some(self.construct_token_with_literal(
+                                    TokenType::Number,
+                                    Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
+                                )));
+                            }
+                            // If it is a digit, we stay in this state and keep consuming digits.
+                        },
+                        None => {
+                            return Ok(Some(self.construct_token_with_literal(
+                                TokenType::Number,
+                                Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
+                            )))
+                        }
+                    }
+                },
+                State::InNumberAfterDot => {
+                    match current_char_opt {
+                        Some(current_char) => {
+                            if !current_char.is_ascii_digit() {
+                                return Ok(Some(self.construct_token_with_literal(
+                                    TokenType::Number,
+                                    Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
+                                )));
+                            }
+                            // If it is a digit, we stay in this state and keep consuming digits.
+                        },
+                        None => {
+                            return Ok(Some(self.construct_token_with_literal(
+                                TokenType::Number,
+                                Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
+                            )))
+                        }
+                    }
+                },
+                State::InWord => {
+                    if current_char_opt.map_or(true, |current_char| !(current_char.is_ascii_alphanumeric() || current_char == '_')) {
+                        // Construct the token if we are at the end of the file OR if current character is NOT alphanumeric or an `_`.
+                        let lexeme = &self.source[self.start..self.current_index];
+                        return Ok(Some(match lexeme {
+                            "and" => self.construct_token(TokenType::And),
+                            "class" => self.construct_token(TokenType::Class),
+                            "else" => self.construct_token(TokenType::Else),
+                            "false" => self.construct_token(TokenType::False),
+                            "func" => self.construct_token(TokenType::Func),
+                            "for" => self.construct_token(TokenType::For),
+                            "if" => self.construct_token(TokenType::If),
+                            "null" => self.construct_token(TokenType::Null),
+                            "or" => self.construct_token(TokenType::Or),
+                            "print" => self.construct_token(TokenType::Print),
+                            "return" => self.construct_token(TokenType::Return),
+                            "self" => self.construct_token(TokenType::Self_),
+                            "true" => self.construct_token(TokenType::True),
+                            "var" => self.construct_token(TokenType::Var),
+                            "while" => self.construct_token(TokenType::While),
+                            _ => self.construct_token(TokenType::Identifier)
+                        }));
+                    }
+                },
 
-            // Ignore these hidden characters.
-            ' ' | '\r' | '\t' => (),
-
-            // Increment line number.
-            '\n' => self.line += 1,
-
-            other => {
-                // If the character does not match any of the above rules, raise an error.
-                return Err(error::report(ErrorType::UnexpectedCharacter {
-                    character: other,
-                    line: self.line,
-                }));
-            },
-        };
-
-        Ok(())
-    }
-
-    /// Processes string literals.
-    fn string(&mut self) -> Result<(), ErrorType> {
-        while self.peek() != Some('"') && !self.is_at_end() {
-            // Keep advancing until we reach the end of the file or a `"`.
-            if self.advance()? == '\n' {
-                self.line += 1;
+                State::NoOp => return Ok(None)
             }
+
+            self.current_index += 1;
         }
-
-        if self.is_at_end() {
-            // We have reached the end and there was no closing `"`.
-            return Err(error::report(ErrorType::UnterminatedString));
-        } else {
-            // Consume the closing `"`.
-            self.advance()?;
-            let literal = Literal::String_(self.source[self.start+1..self.current-1].to_owned());
-            self.add_token_with_literal(TokenType::String_, literal);
-        }
-
-        Ok(())
-    }
-
-    /// Processes number literals.
-    fn number(&mut self) -> Result<(), ErrorType> {
-        while self.peek().map_or(false, |c| c.is_ascii_digit()) {
-            // The above statement evaluates to `false` if `peek()` returned `None`. Otherwise, it will evaluate to the result of the closure.
-            self.advance()?;
-        }
-
-        if self.peek() == Some('.') && self.peek_next().map_or(false, |c| c.is_ascii_digit()) {
-            // Consume `.` as part of the number only if it is followed by a digit.
-            self.advance()?;
-        }
-
-        while self.peek().map_or(false, |c| c.is_ascii_digit()) {
-            // Consume fractional part.
-            self.advance()?;
-        }
-
-        let literal = Literal::Number(self.source[self.start..self.current].parse().unwrap());
-        self.add_token_with_literal(TokenType::Number, literal);
-
-        Ok(())
-    }
-
-    /// Processes identifiers and keywords.
-    fn word(&mut self) -> Result<(), ErrorType> {
-        while self.peek().map_or(false, |c| c.is_ascii_alphanumeric() || c == '_') {
-            // Allow alphanumeric characters and `_` in identifiers.
-            self.advance()?;
-        }
-
-        let lexeme = &self.source[self.start..self.current];
-
-        // Check if the lexeme is a keyword. If so, process as keyword. Otherwise, process as identifier.
-        match lexeme {
-            "and" => self.add_token(TokenType::And),
-            "class" => self.add_token(TokenType::Class),
-            "else" => self.add_token(TokenType::Else),
-            "false" => self.add_token(TokenType::False),
-            "func" => self.add_token(TokenType::Func),
-            "for" => self.add_token(TokenType::For),
-            "if" => self.add_token(TokenType::If),
-            "null" => self.add_token(TokenType::Null),
-            "or" => self.add_token(TokenType::Or),
-            "print" => self.add_token(TokenType::Print),
-            "return" => self.add_token(TokenType::Return),
-            "self" => self.add_token(TokenType::Self_),
-            "true" => self.add_token(TokenType::True),
-            "var" => self.add_token(TokenType::Var),
-            "while" => self.add_token(TokenType::While),
-            _ => self.add_token(TokenType::Identifier)
-        };
-
-        Ok(())
-    }
-
-    /// Consumes and returns the next character pointed to by `current`.
-    fn advance(&mut self) -> Result<char, ErrorType> {
-        match self.source.chars().nth(self.current) {
-            Some(c) => {
-                self.current += 1;
-                Ok(c)
-            },
-            None => {
-                // Somehow `current` points to something after the end. Bubble up an error.
-                Err(error::report(ErrorType::UnexpectedEof))
-            },
-        }
-    }
-
-    /// Checks if next character pointed to by `current` is `expected`. If so, consume it and return true.
-    fn match_next(&mut self, expected: char) -> Result<bool, ErrorType> {
-        match self.source.chars().nth(self.current) {
-            Some(c) => {
-                if expected == c {
-                    self.current += 1;
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            },
-            None => {
-                // Somehow `current` points to something after the end. Bubble up an error.
-                Err(error::report(ErrorType::UnexpectedEof))
-            },
-        }
-    }
-
-    /// Returns the next character if there is one.
-    fn peek(&self) -> Option<char> {
-        self.source.chars().nth(self.current)
-    }
-
-    /// Helper function for better readability. Returns whether `current` is out of range (we have reached the end).
-    fn is_at_end(&self) -> bool {
-        self.peek().is_none()
-    }
-
-    /// Returns the character after next if there is one.
-    fn peek_next(&self) -> Option<char> {
-        self.source.chars().nth(self.current + 1)
     }
 
     /// Adds a token that does not represent a literal value.
-    fn add_token(&mut self, token_type: TokenType) {
-        self.add_token_with_literal(token_type, Literal::Null);
+    fn construct_token(&mut self, token_type: TokenType) -> Token {
+        self.construct_token_with_literal(token_type, Literal::Null)
     }
 
     /// Adds an entire token.
-    fn add_token_with_literal(&mut self, token_type: TokenType, literal: Literal) {
-        self.tokens.push(Token {
+    fn construct_token_with_literal(&mut self, token_type: TokenType, literal: Literal) -> Token {
+        Token {
             type_: token_type,
-            lexeme: String::from(&self.source[self.start..self.current]),
+            lexeme: String::from(&self.source[self.start..self.current_index]),
             literal,
             line: self.line,
-        });
+        }
     }
 }
 
@@ -310,13 +343,18 @@ mod tests {
 
     #[test]
     fn literals() {
-        let source = "\"abc\" 123 \"abc123\" 123.5 \"\"";
+        let source = "\"abc\" 123 \"abc123\" 123.5 \"\" 123abc 5.5.5";
         assert_eq!(Ok(vec![
             Token { type_: TokenType::String_, lexeme: String::from("\"abc\""), literal: Literal::String_(String::from("abc")), line: 1 },
             Token { type_: TokenType::Number, lexeme: String::from("123"), literal: Literal::Number(123.0), line: 1 },
             Token { type_: TokenType::String_, lexeme: String::from("\"abc123\""), literal: Literal::String_(String::from("abc123")), line: 1 },
             Token { type_: TokenType::Number, lexeme: String::from("123.5"), literal: Literal::Number(123.5), line: 1 },
             Token { type_: TokenType::String_, lexeme: String::from("\"\""), literal: Literal::String_(String::from("")), line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("123"), literal: Literal::Number(123.0), line: 1 },
+            Token { type_: TokenType::Identifier, lexeme: String::from("abc"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("5.5"), literal: Literal::Number(5.5), line: 1 },
+            Token { type_: TokenType::Dot, lexeme: String::from("."), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("5"), literal: Literal::Number(5.0), line: 1 },
             Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
         ]), tokenize(source));
     }
@@ -344,6 +382,16 @@ mod tests {
             Token { type_: TokenType::Identifier, lexeme: String::from("a"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Identifier, lexeme: String::from("a2"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
+        ]), tokenize(source));
+    }
+
+    #[test]
+    fn comments() {
+        let source = "1\n#abc\n#abc\n1";
+        assert_eq!(Ok(vec![
+            Token { type_: TokenType::Number, lexeme: String::from("1"), literal: Literal::Number(1.0), line: 1 },
+            Token { type_: TokenType::Number, lexeme: String::from("1"), literal: Literal::Number(1.0), line: 4 },
+            Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 4 },
         ]), tokenize(source));
     }
 }
