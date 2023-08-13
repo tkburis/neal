@@ -376,11 +376,15 @@ mod tests {
     }
 
     #[test]
-    fn identifiers() {
-        let source = "a a2";
+    fn identifiers_and_keywords() {
+        let source = "a a2 if and or ifandor";
         assert_eq!(Ok(vec![
             Token { type_: TokenType::Identifier, lexeme: String::from("a"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Identifier, lexeme: String::from("a2"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::If, lexeme: String::from("if"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::And, lexeme: String::from("and"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Or, lexeme: String::from("or"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Identifier, lexeme: String::from("ifandor"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
         ]), tokenize(source));
     }
