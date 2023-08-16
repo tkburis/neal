@@ -58,9 +58,8 @@ impl<'a> Tokenizer<'a> {
     /// Returns a vector of tokens if no error had taken place. Otherwise, returns `Err(())`.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, ErrorType> {
         while self.source.chars().nth(self.current_index).is_some() {
-            match self.scan_token()? {
-                Some(token) => self.tokens.push(token),
-                None => ()
+            if let Some(token) = self.scan_token()? {
+                self.tokens.push(token);
             }
         }
 
@@ -151,7 +150,8 @@ impl<'a> Tokenizer<'a> {
                 State::InComment => {
                     // If we have a new line or we have reached the end of the file, the comment has ended.
                     if current_char_opt == Some('\n') || current_char_opt.is_none() {
-                        return Ok(None);
+                        self.line += 1;
+                        self.current_state = State::NoOp;
                     }
                 },
 
