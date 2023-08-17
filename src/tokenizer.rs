@@ -129,7 +129,7 @@ impl<'a> Tokenizer<'a> {
                             },
                         }
                     } else {
-                        self.current_state = State::NoOp;
+                        return Ok(None);
                     }
                 },
 
@@ -149,8 +149,10 @@ impl<'a> Tokenizer<'a> {
 
                 State::InComment => {
                     // If we have a new line or we have reached the end of the file, the comment has ended.
-                    if current_char_opt == Some('\n') || current_char_opt.is_none() {
+                    if current_char_opt == Some('\n') {
                         self.line += 1;
+                        self.current_state = State::NoOp;
+                    } else if current_char_opt.is_none() {
                         self.current_state = State::NoOp;
                     }
                 },
