@@ -1,6 +1,7 @@
 mod error;
 mod expr;
 mod parser;
+mod stmt;
 mod token;
 mod tokenizer;
 

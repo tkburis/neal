@@ -30,5 +30,5 @@ pub enum Expr {
     },
     Variable {
         name: String,  // More specifically, `Token` with `Identifier` type. Let's try String. Formerly Token.
-    }
+    },
 }

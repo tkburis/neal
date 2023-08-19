@@ -39,7 +39,7 @@ pub struct Tokenizer<'a> {
     start: usize,  // Points to the start of the current token.
     current_index: usize,  // Points to the *next* character to be scanned.
     current_state: State,  // The current state of the finite automaton.
-    line: usize,  // Keeps track of the current line number.
+    current_line: usize,  // Keeps track of the current line number.
 }
 
 impl<'a> Tokenizer<'a> {
@@ -50,7 +50,7 @@ impl<'a> Tokenizer<'a> {
             start: 0,
             current_index: 0,
             current_state: State::Start,
-            line: 1,
+            current_line: 1,
         }
     }
 
@@ -67,7 +67,7 @@ impl<'a> Tokenizer<'a> {
             type_: TokenType::Eof,
             lexeme: String::from(""),
             literal: Literal::Null,
-            line: self.line
+            line: self.current_line
         });
 
         Ok(self.tokens.clone())
@@ -116,7 +116,7 @@ impl<'a> Tokenizer<'a> {
                             ' ' | '\r' | '\t' => self.current_state = State::NoOp,
     
                             '\n' => {
-                                self.line += 1;
+                                self.current_line += 1;
                                 self.current_state = State::NoOp;
                             },
     
@@ -124,7 +124,7 @@ impl<'a> Tokenizer<'a> {
                                 // If the character does not match any of the above rules, raise an error.
                                 return Err(error::report_and_return(ErrorType::UnexpectedCharacter {
                                     character: other,
-                                    line: self.line,
+                                    line: self.current_line,
                                 }));
                             },
                         }
@@ -150,7 +150,7 @@ impl<'a> Tokenizer<'a> {
                 State::InComment => {
                     // If we have a new line or we have reached the end of the file, the comment has ended.
                     if current_char_opt == Some('\n') {
-                        self.line += 1;
+                        self.current_line += 1;
                         self.current_state = State::NoOp;
                     } else if current_char_opt.is_none() {
                         self.current_state = State::NoOp;
@@ -290,7 +290,7 @@ impl<'a> Tokenizer<'a> {
             type_: token_type,
             lexeme: String::from(&self.source[self.start..self.current_index]),
             literal,
-            line: self.line,
+            line: self.current_line,
         }
     }
 }
