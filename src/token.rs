@@ -27,6 +27,7 @@ pub enum TokenType {
 pub enum Literal {
     Number(f64),
     String_(String),
+    Bool(bool),
     Null,
 }
 
@@ -35,6 +36,7 @@ pub enum Value {
     Number(f64),
     String_(String),
     Bool(bool),
+    Array(Vec<Value>),
     Null,
 }
 

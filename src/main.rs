@@ -1,6 +1,8 @@
+mod error;
+mod expr;
+mod parser;
 mod token;
 mod tokenizer;
-mod error;
 
 use std::env;
 use std::io;
@@ -9,6 +11,8 @@ use std::process;
 use std::fs;
 
 use error::ErrorType;
+use parser::Parser;
+use tokenizer::Tokenizer;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -39,8 +43,12 @@ fn run_prompt() {
 }
 
 fn run(source: &str) -> Result<(), ErrorType> {
-    let mut tokenizer = tokenizer::Tokenizer::new(source);
+    let mut tokenizer = Tokenizer::new(source);
     let tokens = tokenizer.tokenize()?;
-    println!("{:?}", tokens);
+    println!("TOKENS: {:?}", tokens);
+
+    let mut parser = Parser::new(tokens);
+    let ast = parser.parse()?;
+    println!("AST: {:?}", ast);
     Ok(())
 }

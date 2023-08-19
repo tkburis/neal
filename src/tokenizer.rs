@@ -122,7 +122,7 @@ impl<'a> Tokenizer<'a> {
     
                             other => {
                                 // If the character does not match any of the above rules, raise an error.
-                                return Err(error::report(ErrorType::UnexpectedCharacter {
+                                return Err(error::report_and_return(ErrorType::UnexpectedCharacter {
                                     character: other,
                                     line: self.line,
                                 }));
@@ -197,7 +197,7 @@ impl<'a> Tokenizer<'a> {
                         self.current_state = State::GotString;
                     } else if current_char_opt.is_none() {
                         // We have reached the end and there was no closing `"`.
-                        return Err(error::report(ErrorType::UnterminatedString));
+                        return Err(error::report_and_return(ErrorType::UnterminatedString));
                     }
                 },
                 State::GotString => {
