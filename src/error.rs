@@ -36,6 +36,9 @@ pub enum ErrorType {
     ExpectedParenAfterIncrement {
         line: usize,
     },
+    InvalidAssignmentTarget {
+        line: usize,
+    },
 }
 
 pub fn report_and_return(type_: ErrorType) -> ErrorType {
@@ -56,7 +59,7 @@ pub fn report_and_return(type_: ErrorType) -> ErrorType {
             println!("Expected expression on line {}.", &line.to_string());
         },
         ErrorType::ExpectedFunctionName { line } => {
-            println!("Expected function name on line {}.", &line.to_string());
+            println!("Expected function name on line {}. Make sure it is not a keyword.", &line.to_string());
         },
         ErrorType::ExpectedParameterName { line } => {
             println!("Expected parameter name in function declaration on line {}.", &line.to_string());
@@ -72,7 +75,10 @@ pub fn report_and_return(type_: ErrorType) -> ErrorType {
         },
         ErrorType::ExpectedParenAfterIncrement { line } => {
             println!("Expected `)` after increment statement in `for` loop on line {}.", &line.to_string());
-        }
+        },
+        ErrorType::InvalidAssignmentTarget { line } => {
+            println!("Invalid assignment target on line {}.", &line.to_string());
+        },
     }
     type_
 }

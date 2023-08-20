@@ -2,10 +2,6 @@ use crate::expr::Expr;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
-    Assignment {
-        name: String,
-        value: Expr,
-    },
     Block {
         body: Vec<Stmt>,
     },

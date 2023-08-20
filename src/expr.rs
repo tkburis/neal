@@ -5,6 +5,15 @@ pub enum Expr {
     Array {
         elements: Vec<Expr>,
     },
+    Assignment {
+        // Assignment is an expression for two reasons:
+        // 1. Expressions like `a = b = 5` work;
+        // 2. Calls have to be checked *before* assignments.
+        // Otherwise, the statement `f()` will not work because we expect an `=` after the identifier.
+        // Note `target` is an expression to allow both `Variable`s and `Element`s.
+        target: Box<Expr>,
+        value: Box<Expr>,
+    },
     Binary {
         left: Box<Expr>,
         operator: token::Token,
