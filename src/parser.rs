@@ -510,7 +510,7 @@ mod tests {
 
     use super::Parser;
 
-    fn parse_to_stmts(source: &str) -> Result<Vec<Stmt>, ErrorType> {
+    fn parse(source: &str) -> Result<Vec<Stmt>, ErrorType> {
         let mut tokenizer = Tokenizer::new(source);
         let tokens = tokenizer.tokenize()?;
         let mut parser = Parser::new(tokens);
@@ -554,7 +554,7 @@ mod tests {
                     }),
                 },
             ]
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
     
     #[test]
@@ -588,7 +588,7 @@ mod tests {
                     ],
                 }),
             },
-        ]), parse_to_stmts(source));
+        ]), parse(source));
     }
     
     #[test]
@@ -624,7 +624,7 @@ mod tests {
                     }),
                 },
             ]
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
     
     #[test]
@@ -656,37 +656,37 @@ mod tests {
                     }),
                 },
             ]
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
     
     #[test]
     fn for_no_init_semicolon() {
         let source = "for (var x = 5 x < 10; x = x + 1) {var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedSemicolonAfterInit { line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedSemicolonAfterInit { line: 1 }), parse(source));
     }
     
     #[test]
     fn for_no_cond_semicolon() {
         let source = "for (var x = 5; x < 10 x = x + 1) {var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedSemicolonAfterCondition { line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedSemicolonAfterCondition { line: 1 }), parse(source));
     }
     
     #[test]
     fn unclosed_for() {
         let source = "for (var x = 5; x < 10; x = x + 1 {var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedParenAfterIncrement { line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedParenAfterIncrement { line: 1 }), parse(source));
     }
 
     #[test]
     fn unopened_block() {
         let source = "for (var x = 5; x < 10; x = x + 1) var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: '{', line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: '{', line: 1 }), parse(source));
     }
 
     #[test]
     fn unclosed_block() {
         let source = "for (var x = 5; x < 10; x = x + 1) {var y = x";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: '}', line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: '}', line: 1 }), parse(source));
     }
     
     #[test]
@@ -699,13 +699,13 @@ mod tests {
                 Stmt::Print { expression: Expr::Variable { name: String::from("a") }},
                 Stmt::Print { expression: Expr::Variable { name: String::from("b") }},
             ]}),
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
 
     #[test]
     fn func_keyword_name() {
         let source = "func print(a, b) {print a print b}";
-        assert_eq!(Err(ErrorType::ExpectedFunctionName { line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedFunctionName { line: 1 }), parse(source));
     }
 
     #[test]
@@ -719,7 +719,7 @@ mod tests {
             },
             then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("a") } }] }),
             else_body: None,
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
 
     #[test]
@@ -753,7 +753,7 @@ mod tests {
                     )),
                 }
             )),
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
 
     #[test]
@@ -767,7 +767,7 @@ mod tests {
             },
             then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("a") } }] }),
             else_body: Some(Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] })),
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
 
     #[test]
@@ -795,19 +795,19 @@ mod tests {
                     }),
                 }),
             }),
-        }}]), parse_to_stmts(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn var() {
         let source = "var a = 5";
-        assert_eq!(Ok(vec![Stmt::VarDecl { name: String::from("a"), value: Expr::Literal { value: token::Literal::Number(5.0) } }]), parse_to_stmts(source));
+        assert_eq!(Ok(vec![Stmt::VarDecl { name: String::from("a"), value: Expr::Literal { value: token::Literal::Number(5.0) } }]), parse(source));
     }
 
     #[test]
     fn invalid_var_name() {
         let source = "var 123 = 5";
-        assert_eq!(Err(ErrorType::ExpectedVariableName { line: 1 }), parse_to_stmts(source));
+        assert_eq!(Err(ErrorType::ExpectedVariableName { line: 1 }), parse(source));
     }
 
     #[test]
@@ -820,7 +820,7 @@ mod tests {
                 right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
             },
             body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] }),
-        }]), parse_to_stmts(source));
+        }]), parse(source));
     }
 
     #[test]
@@ -838,20 +838,13 @@ mod tests {
                 else_body: Some(Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] })),
             },
             Stmt::VarDecl { name: String::from("c"), value: Expr::Literal { value: token::Literal::Number(3.0) } },
-        ]), parse_to_stmts(source));
-    }
-    
-    fn parse_to_expr(source: &str) -> Result<Expr, ErrorType> {
-        let mut tokenizer = Tokenizer::new(source);
-        let tokens = tokenizer.tokenize()?;
-        let mut parser = Parser::new(tokens);
-        parser.expression()
+        ]), parse(source));
     }
 
     #[test]
     fn bidmas() {
         let source = "5*1+2*(3-4/a)";
-        assert_eq!(Ok(Expr::Binary {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
             left: Box::new(Expr::Binary {
                 left: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
                 operator: token::Token { type_: token::TokenType::Star, lexeme: String::from("*"), literal: token::Literal::Null, line: 1 },
@@ -873,13 +866,13 @@ mod tests {
                     }),
                 }),
             }),
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn logic() {
         let source = "true and true or false and true or false";
-        assert_eq!(Ok(Expr::Binary {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
             left: Box::new(Expr::Binary {
                 left: Box::new(Expr::Binary {
                     left: Box::new(Expr::Literal {value: token::Literal::Bool(true) }),
@@ -895,13 +888,13 @@ mod tests {
             }),
             operator: token::Token { type_: token::TokenType::Or, lexeme: String::from("or"), literal: token::Literal::Null, line: 1 },
             right: Box::new(Expr::Literal {value: token::Literal::Bool(false) }),
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn array() {
         let source = "[[5, a, b], 3+1, \"g\"]";
-        assert_eq!(Ok(Expr::Array {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Array {
             elements: vec![
                 Expr::Array {
                     elements: vec![
@@ -917,73 +910,76 @@ mod tests {
                 },
                 Expr::Literal { value: token::Literal::String_(String::from("g")) },
             ]
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
     
     #[test]
     fn empty_array() {
         let source = "[]";
-        assert_eq!(Ok(Expr::Array {elements: vec![] }), parse_to_expr(source));
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Array {elements: vec![] }}]), parse(source));
     }
 
     #[test]
     fn unclosed_array() {
         let source = "[[5, a, b], 3+1, \"g\"";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 1 }), parse(source));
         let source = "[[5, a, b, 3+1, \"g\"]";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 1 }), parse(source));
     }
     
     #[test]
     fn error_line_numbers() {
         let source = "\n[[5, a, b, 3+1, \"g\"]";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 2 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 2 }), parse(source));
         let source = "a[2.3]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
         let source = "\na[-2]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 2 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::InvalidIndex { line: 2 }), parse(source));
         let source = "\n\na[\"abc\"]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 3 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::InvalidIndex { line: 3 }), parse(source));
     }
 
     #[test]
     fn unclosed_grouping() {
         let source = "(5 + 5";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse(source));
     }
 
     #[test]
     fn element() {
         let source = "a[5]";
-        assert_eq!(Ok(Expr::Element { array: Box::new(Expr::Variable { name: String::from("a") }), index: 5 }), parse_to_expr(source));
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Element {
+            array: Box::new(Expr::Variable { name: String::from("a") }),
+            index: 5,
+        }}]), parse(source));
     }
     
     #[test]
     fn element_2d() {
         let source = "a[1][2]";
-        assert_eq!(Ok(Expr::Element {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Element {
             array: Box::new(Expr::Element {
                 array: Box::new(Expr::Variable { name: String::from("a") }),
                 index: 1,
             }),
             index: 2,
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
     
     #[test]
     fn invalid_index() {
         let source = "a[2.3]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
         let source = "a[-2]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
         let source = "a[\"abc\"]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
     }
 
     #[test]
     fn comparison() {
         let source = "1 < 2 == 3 > 4 <= 5 >= 6 != 7";
-        assert_eq!(Ok(Expr::Binary {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
             left: Box::new(Expr::Binary {
                 left: Box::new(Expr::Binary {
                     left: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
@@ -1007,13 +1003,13 @@ mod tests {
             }),
             operator: token::Token { type_: token::TokenType::BangEqual, lexeme: String::from("!="), literal: token::Literal::Null, line: 1 },
             right: Box::new(Expr::Literal { value: token::Literal::Number(7.0) }),
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn call() {
         let source = "a(1, \"a\")(bc, 2+3)";
-        assert_eq!(Ok(Expr::Call {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Call {
             callee: Box::new(Expr::Call {
                 callee: Box::new(Expr::Variable { name: String::from("a") }),
                 arguments: vec![Expr::Literal { value: token::Literal::Number(1.0) }, Expr::Literal { value: token::Literal::String_(String::from("a")) }],
@@ -1026,30 +1022,30 @@ mod tests {
                     right: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
                 }
             ],
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
     
     #[test]
     fn empty_call() {
         let source = "a()";
-        assert_eq!(Ok(Expr::Call {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Call {
             callee: Box::new(Expr::Variable { name: String::from("a") }),
             arguments: vec![],
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
     
     #[test]
     fn unclosed_call() {
         let source = "a(1, \"a\"(bc, 2+3)";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse(source));
         let source = "a(1, \"a\")(bc, 2+3";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse_to_expr(source));
+        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse(source));
     }
 
     #[test]
     fn unary() {
         let source = "!!--5";
-        assert_eq!(Ok(Expr::Unary {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Unary {
             operator: token::Token { type_: token::TokenType::Bang, lexeme: String::from("!"), literal: token::Literal::Null, line: 1 },
             right: Box::new(Expr::Unary {
                 operator: token::Token { type_: token::TokenType::Bang, lexeme: String::from("!"), literal: token::Literal::Null, line: 1 },
@@ -1061,19 +1057,19 @@ mod tests {
                     }),
                 }),
             }),
-        }), parse_to_expr(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn etc() {
         let source = "5--4";
-        assert_eq!(Ok(Expr::Binary {
+        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
             left: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
             operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
             right: Box::new(Expr::Unary {
                 operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
                 right: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
             }),
-        }), parse_to_expr(source))
+        }}]), parse(source))
     }
 }
