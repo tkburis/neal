@@ -95,9 +95,11 @@ impl Parser {
 
         // Now we convert it to:
         //  {
-        //      `init`
+        //      `initialiser`
         //      while (`condition`) {
-        //          `body`
+        //          {
+        //              `for_body`
+        //          }
         //          `increment`
         //      }
         //  }
