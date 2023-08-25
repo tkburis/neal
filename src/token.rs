@@ -32,6 +32,8 @@ pub enum Literal {
 }
 
 /// `Value` represents evaluated values within the interpreter.
+// TODO: Move to separate file
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Number(f64),
     String_(String),

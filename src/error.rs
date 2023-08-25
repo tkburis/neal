@@ -39,6 +39,12 @@ pub enum ErrorType {
     InvalidAssignmentTarget {
         line: usize,
     },
+
+    // Environment errors.
+    NameError {
+        name: String,
+        line: usize,
+    },
 }
 
 pub fn report_and_return(type_: ErrorType) -> ErrorType {
@@ -78,6 +84,9 @@ pub fn report_and_return(type_: ErrorType) -> ErrorType {
         },
         ErrorType::InvalidAssignmentTarget { line } => {
             println!("Invalid assignment target on line {}.", &line.to_string());
+        },
+        ErrorType::NameError { ref name, line } => {
+            println!("Line {0}: '{1}' is not defined.", &line.to_string(), name);
         },
     }
     type_

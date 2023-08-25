@@ -1,5 +1,7 @@
+mod environment;
 mod error;
 mod expr;
+mod interpreter;
 mod parser;
 mod stmt;
 mod token;
