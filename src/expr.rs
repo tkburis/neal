@@ -1,4 +1,4 @@
-use crate::token;
+use crate::token::{self, Value};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -40,4 +40,21 @@ pub enum Expr {
     Variable {
         name: String,  // More specifically, `Token` with `Identifier` type. Let's try String. Formerly Token.
     },
+}
+
+impl Expr {
+    pub fn evaluate(self) -> Value {
+        match self {
+            Expr::Array { elements } => {
+                let values: Vec<Value> = elements.iter().map(|&x| x.evaluate()).collect();
+                Value::Array(values)
+            },
+            Expr::Assignment { target, value } => {
+                
+            },
+            Expr::Binary { left, operator, right } => {},
+            Expr::Call { callee, arguments } => {},
+
+        }
+    }
 }

@@ -18,14 +18,45 @@ impl Parser {
         }
     }
 
-    // TODO: possible improvement: instead of reporting error when it occurs, bubble up ErrorType and collect in a vec. Then report all at once.
+    // TODO: clean up error reports; `advance` method (increment index and line)
     // TODO: error handling; stmts
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, ErrorType> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<ErrorType>> {
         let mut statements: Vec<Stmt> = Vec::new();
+        let mut errors: Vec<ErrorType> = Vec::new();
         while !self.check_next(&[TokenType::Eof]) {
-            statements.push(self.statement()?);
+            match self.statement() {
+                Ok(statement) => statements.push(statement),
+                Err(error) => {
+                    errors.push(error);
+                    self.sync();
+                },
+            }
         }
-        Ok(statements)
+        for error in &errors {
+            error::report_and_return(error);
+        }
+
+        if errors.is_empty() {
+            Ok(statements)
+        } else {
+            Err(errors)
+        }
+    }
+
+    fn sync(&mut self) {
+        while !self.check_next(&[
+            TokenType::Eof,
+            TokenType::For,
+            TokenType::Func,
+            TokenType::If,
+            TokenType::Print,
+            TokenType::Return,
+            TokenType::Var,
+            TokenType::While,
+        ]) {
+            self.current_index += 1;
+            self.current_line = self.tokens[self.current_index].line;
+        }
     }
     
     fn statement(&mut self) -> Result<Stmt, ErrorType> {
@@ -37,6 +68,8 @@ impl Parser {
             self.if_()
         } else if self.check_and_consume(&[TokenType::Print]).is_some() {
             self.print()
+        } else if self.check_and_consume(&[TokenType::Return]).is_some() {
+            self.return_()
         } else if self.check_and_consume(&[TokenType::Var]).is_some() {
             self.var()
         } else if self.check_and_consume(&[TokenType::While]).is_some() {
@@ -70,7 +103,7 @@ impl Parser {
         }
 
         if self.check_and_consume(&[TokenType::Semicolon]).is_none() {
-            return Err(error::report_and_return(ErrorType::ExpectedSemicolonAfterInit { line: self.current_line }));
+            return Err(ErrorType::ExpectedSemicolonAfterInit { line: self.current_line });
         }
 
         let mut condition = Expr::Literal { value: Literal::Bool(true) };  // If there is no given condition, always `true`.
@@ -79,7 +112,7 @@ impl Parser {
         }
 
         if self.check_and_consume(&[TokenType::Semicolon]).is_none() {
-            return Err(error::report_and_return(ErrorType::ExpectedSemicolonAfterCondition { line: self.current_line }));
+            return Err(ErrorType::ExpectedSemicolonAfterCondition { line: self.current_line });
         }
 
         let mut increment: Option<Stmt> = None;
@@ -88,7 +121,7 @@ impl Parser {
         }
 
         if self.check_and_consume(&[TokenType::RightParen]).is_none() {
-            return Err(error::report_and_return(ErrorType::ExpectedParenAfterIncrement { line: self.current_line }));
+            return Err(ErrorType::ExpectedParenAfterIncrement { line: self.current_line });
         }
 
         let for_body = self.block()?;
@@ -134,7 +167,7 @@ impl Parser {
                     if let Some(parameter) = self.check_and_consume(&[TokenType::Identifier]) {
                         parameters.push(parameter.lexeme);
                     } else {
-                        return Err(error::report_and_return(ErrorType::ExpectedParameterName { line: self.current_line }));
+                        return Err(ErrorType::ExpectedParameterName { line: self.current_line });
                     }
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
                         break;
@@ -152,7 +185,7 @@ impl Parser {
                 body: Box::new(body),
             })
         } else {
-            Err(error::report_and_return(ErrorType::ExpectedFunctionName { line: self.current_line }))
+            Err(ErrorType::ExpectedFunctionName { line: self.current_line })
         }
     }
 
@@ -194,6 +227,10 @@ impl Parser {
         Ok(Stmt::Print { expression: self.expression()? })
     }
 
+    fn return_(&mut self) -> Result<Stmt, ErrorType> {
+        Ok(Stmt::Print { expression: self.expression()? })
+    }
+
     fn var(&mut self) -> Result<Stmt, ErrorType> {
         if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
             self.expect(TokenType::Equal, '=')?;
@@ -204,7 +241,7 @@ impl Parser {
                 value,
             })
         } else {
-            Err(error::report_and_return(ErrorType::ExpectedVariableName { line: self.current_line }))
+            Err(ErrorType::ExpectedVariableName { line: self.current_line })
         }
     }
 
@@ -245,7 +282,7 @@ impl Parser {
                     })
                 },
                 _ => {
-                    Err(error::report_and_return(ErrorType::InvalidAssignmentTarget { line: self.current_line }))
+                    Err(ErrorType::InvalidAssignmentTarget { line: self.current_line })
                 }
             }
         } else {
@@ -371,13 +408,13 @@ impl Parser {
                     if float >= 0.0 && float.fract() == 0.0 {
                         expr = Expr::Element { array: Box::new(expr), index: float as usize };
                     } else {
-                        return Err(error::report_and_return(ErrorType::InvalidIndex { line: self.current_line }));
+                        return Err(ErrorType::InvalidIndex { line: self.current_line });
                     }
                 } else {
-                    return Err(error::report_and_return(ErrorType::InvalidIndex { line: self.current_line }));
+                    return Err(ErrorType::InvalidIndex { line: self.current_line });
                 }
             } else {
-                return Err(error::report_and_return(ErrorType::InvalidIndex { line: self.current_line }));
+                return Err(ErrorType::InvalidIndex { line: self.current_line });
             }
             
             self.expect(TokenType::RightSquare, ']')?;
@@ -462,7 +499,8 @@ impl Parser {
             Ok(Expr::Variable { name: identifier.lexeme })
 
         } else {
-            Err(error::report_and_return(ErrorType::ExpectedExpression { line: self.current_line }))
+            // TODO: This should probably say which character it found as well. E.g., input '{'
+            Err(ErrorType::ExpectedExpression { line: self.current_line })
         }
     }
 
@@ -496,10 +534,10 @@ impl Parser {
 
     fn expect(&mut self, expected_type: TokenType, expected_char: char) -> Result<(), ErrorType> {
         if self.check_and_consume(&[expected_type]).is_none() {
-            return Err(error::report_and_return(ErrorType::ExpectedCharacter {
+            return Err(ErrorType::ExpectedCharacter {
                 expected: expected_char,
                 line: self.current_line,
-            }));
+            });
         }
 
         Ok(())
@@ -512,11 +550,23 @@ mod tests {
 
     use super::Parser;
 
-    fn parse(source: &str) -> Result<Vec<Stmt>, ErrorType> {
+    fn parse(source: &str) -> Result<Vec<Stmt>, Vec<ErrorType>> {
         let mut tokenizer = Tokenizer::new(source);
-        let tokens = tokenizer.tokenize()?;
+        let tokens = tokenizer.tokenize().expect("Tokenizer returned error.");
         let mut parser = Parser::new(tokens);
         parser.parse()
+    }
+
+    fn errors_in_result(result: Result<Vec<Stmt>, Vec<ErrorType>>, errors: Vec<ErrorType>) -> bool {
+        let Err(result_errors) = result else {
+            return false;
+        };
+        for error in errors {
+            if !result_errors.contains(&error) {
+                return false;
+            }
+        }
+        true
     }
 
     #[test]
@@ -664,31 +714,31 @@ mod tests {
     #[test]
     fn for_no_init_semicolon() {
         let source = "for (var x = 5 x < 10; x = x + 1) {var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedSemicolonAfterInit { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedSemicolonAfterInit { line: 1 }]));
     }
     
     #[test]
     fn for_no_cond_semicolon() {
         let source = "for (var x = 5; x < 10 x = x + 1) {var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedSemicolonAfterCondition { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedSemicolonAfterCondition { line: 1 }]));
     }
     
     #[test]
     fn unclosed_for() {
         let source = "for (var x = 5; x < 10; x = x + 1 {var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedParenAfterIncrement { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedParenAfterIncrement { line: 1 }]));
     }
 
     #[test]
     fn unopened_block() {
         let source = "for (var x = 5; x < 10; x = x + 1) var y = x}";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: '{', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: '{', line: 1 }]));
     }
 
     #[test]
     fn unclosed_block() {
         let source = "for (var x = 5; x < 10; x = x + 1) {var y = x";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: '}', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: '}', line: 1 }]));
     }
     
     #[test]
@@ -707,7 +757,7 @@ mod tests {
     #[test]
     fn func_keyword_name() {
         let source = "func print(a, b) {print a print b}";
-        assert_eq!(Err(ErrorType::ExpectedFunctionName { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedFunctionName { line: 1 }]));
     }
 
     #[test]
@@ -809,7 +859,7 @@ mod tests {
     #[test]
     fn invalid_var_name() {
         let source = "var 123 = 5";
-        assert_eq!(Err(ErrorType::ExpectedVariableName { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedVariableName { line: 1 }]));
     }
 
     #[test]
@@ -924,27 +974,27 @@ mod tests {
     #[test]
     fn unclosed_array() {
         let source = "[[5, a, b], 3+1, \"g\"";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ']', line: 1 }]));
         let source = "[[5, a, b, 3+1, \"g\"]";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ']', line: 1 }]));
     }
     
     #[test]
     fn error_line_numbers() {
         let source = "\n[[5, a, b, 3+1, \"g\"]";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ']', line: 2 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ']', line: 2 }]));
         let source = "a[2.3]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
         let source = "\na[-2]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 2 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 2 }]));
         let source = "\n\na[\"abc\"]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 3 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 3 }]));
     }
 
     #[test]
     fn unclosed_grouping() {
         let source = "(5 + 5";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ')', line: 1 }]));
     }
 
     #[test]
@@ -971,11 +1021,11 @@ mod tests {
     #[test]
     fn invalid_index() {
         let source = "a[2.3]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
         let source = "a[-2]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
         let source = "a[\"abc\"]";
-        assert_eq!(Err(ErrorType::InvalidIndex { line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
     }
 
     #[test]
@@ -1039,9 +1089,9 @@ mod tests {
     #[test]
     fn unclosed_call() {
         let source = "a(1, \"a\"(bc, 2+3)";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ')', line: 1 }]));
         let source = "a(1, \"a\")(bc, 2+3";
-        assert_eq!(Err(ErrorType::ExpectedCharacter { expected: ')', line: 1 }), parse(source));
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ')', line: 1 }]));
     }
 
     #[test]
@@ -1072,6 +1122,16 @@ mod tests {
                 operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
                 right: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
             }),
-        }}]), parse(source))
+        }}]), parse(source));
+    }
+
+    #[test]
+    fn sync() {
+        let source = "var b = a[5.5]\nprint {\nfor (x = 5; x < 2; x = x + 1 {print x}";
+        assert!(errors_in_result(parse(source), vec![
+            ErrorType::InvalidIndex { line: 1 },
+            ErrorType::ExpectedExpression { line: 2 },
+            ErrorType::ExpectedParenAfterIncrement { line: 3 },
+        ]));
     }
 }

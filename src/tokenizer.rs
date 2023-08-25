@@ -1,4 +1,4 @@
-use crate::{token::{Token, TokenType, Literal}, error::{self, ErrorType}};
+use crate::{token::{Token, TokenType, Literal, self}, error::{self, ErrorType}};
 
 #[derive(Debug)]
 enum State {
@@ -58,8 +58,16 @@ impl<'a> Tokenizer<'a> {
     /// Returns a vector of tokens if no error had taken place. Otherwise, returns `Err(())`.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, ErrorType> {
         while self.source.chars().nth(self.current_index).is_some() {
-            if let Some(token) = self.scan_token()? {
-                self.tokens.push(token);
+            match self.scan_token() {
+                Ok(token_opt) => {
+                    if let Some(token) = token_opt {
+                        self.tokens.push(token);
+                    }
+                },
+                Err(error) => {
+                    error::report_and_return(&error);
+                    return Err(error);
+                }
             }
         }
 
@@ -122,10 +130,10 @@ impl<'a> Tokenizer<'a> {
     
                             other => {
                                 // If the character does not match any of the above rules, raise an error.
-                                return Err(error::report_and_return(ErrorType::UnexpectedCharacter {
+                                return Err(ErrorType::UnexpectedCharacter {
                                     character: other,
                                     line: self.current_line,
-                                }));
+                                });
                             },
                         }
                     } else {
@@ -197,7 +205,7 @@ impl<'a> Tokenizer<'a> {
                         self.current_state = State::GotString;
                     } else if current_char_opt.is_none() {
                         // We have reached the end and there was no closing `"`.
-                        return Err(error::report_and_return(ErrorType::UnterminatedString));
+                        return Err(ErrorType::UnterminatedString);
                     }
                 },
                 State::GotString => {

@@ -47,7 +47,7 @@ pub enum ErrorType {
     },
 }
 
-pub fn report_and_return(type_: ErrorType) -> ErrorType {
+pub fn report_and_return(type_: &ErrorType) {
     match type_ {
         ErrorType::UnexpectedCharacter { character, line } => {
             println!("Unexpected character `{0}` on line {1}.", &character.to_string(), &line.to_string());
@@ -89,5 +89,4 @@ pub fn report_and_return(type_: ErrorType) -> ErrorType {
             println!("Line {0}: '{1}' is not defined.", &line.to_string(), name);
         },
     }
-    type_
 }

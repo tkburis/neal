@@ -45,13 +45,16 @@ fn run_prompt() {
     }
 }
 
-fn run(source: &str) -> Result<(), ErrorType> {
+fn run(source: &str) {
     let mut tokenizer = Tokenizer::new(source);
-    let tokens = tokenizer.tokenize()?;
+    let Ok(tokens) = tokenizer.tokenize() else {
+        return;
+    };
     println!("TOKENS: {:?}", tokens);
 
     let mut parser = Parser::new(tokens);
-    let ast = parser.parse()?;
+    let Ok(ast) = parser.parse() else {
+        return;
+    };
     println!("AST: {:?}", ast);
-    Ok(())
 }

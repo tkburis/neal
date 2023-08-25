@@ -20,7 +20,7 @@ impl Environment {
     pub fn exit_scope(&mut self) {
         self.scopes.pop();
         if self.scopes.len() == 0 {
-            panic!("All scopes are gone!!!!!!");
+            panic!("Exited out of global scope.");
         }
     }
 
@@ -28,7 +28,7 @@ impl Environment {
         if let Some(last_scope) = self.scopes.last_mut() {
             last_scope.insert(name, value);
         } else {
-            panic!("No scopes to declare to!");
+            panic!("No scopes to declare to.");
         }
     }
 
@@ -38,7 +38,7 @@ impl Environment {
                 return Ok(value.clone());
             }
         }
-        Err(error::report_and_return(ErrorType::NameError { name, line }))
+        Err(ErrorType::NameError { name, line })
     }
 
     pub fn assign(&mut self, name: String, value: Value, line: usize) -> Result<(), ErrorType> {
@@ -48,7 +48,7 @@ impl Environment {
                 return Ok(());
             }
         }
-        Err(error::report_and_return(ErrorType::NameError { name, line }))
+        Err(ErrorType::NameError { name, line })
     }
 }
 
