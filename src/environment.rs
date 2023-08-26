@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{token::Value, error::{ErrorType, self}};
+use crate::{token::Value, error::ErrorType};
 
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
@@ -32,19 +32,58 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: String, line: usize) -> Result<Value, ErrorType> {
+    // TODO: `Storable` trait for `Value` and functions.
+    pub fn get(&self, name: String, index: Option<usize>, line: usize) -> Result<Value, ErrorType> {
         for scope in self.scopes.iter().rev() {
             if let Some(value) = scope.get(&name) {
-                return Ok(value.clone());
+                // If there is a value associated with `name`...
+                if let Some(idx) = index {
+                    // If an index is provided...
+                    return match value {
+                        Value::Array(elements) => {
+                            if let Some(element) = elements.get(idx) {
+                                Ok(element.clone())
+                            } else {
+                                // If the index provided is out-of-bounds or similar...
+                                Err(ErrorType::IndexError { name, index: idx, line })
+                            }
+                        },
+                        // If an index is provided but the value is not an array...
+                        _ => Err(ErrorType::NotIndexable { name, line }),
+                    };
+                } else {
+                    // No index was provided.
+                    return Ok(value.clone());
+                }
             }
         }
         Err(ErrorType::NameError { name, line })
     }
 
-    pub fn assign(&mut self, name: String, value: Value, line: usize) -> Result<(), ErrorType> {
+    // TODO: element stuff
+    pub fn assign(&mut self, name: String, index: Option<usize>, value: Value, line: usize) -> Result<(), ErrorType> {
         for scope in self.scopes.iter_mut().rev() {
-            if scope.contains_key(&name) {
-                scope.insert(name, value);
+            if let Some(old_value) = scope.get_mut(&name) {
+                // If there is a value associated with `name`...
+                if let Some(idx) = index {
+                    // If an index is provided...
+                    return match old_value {
+                        Value::Array(elements) => {
+                            if idx < elements.len() {
+                                elements[idx] = value;
+                                Ok(())
+                            } else {
+                                // If the index provided is out-of-bounds or similar...
+                                Err(ErrorType::IndexError { name, index: idx, line })
+                            }
+                        },
+                        // If an index is provided but the value is not an array...
+                        _ => Err(ErrorType::NotIndexable { name, line }),
+                    }
+                } else {
+                    // No index was provided.
+                    scope.insert(name, value);
+                }
                 return Ok(());
             }
         }
@@ -66,12 +105,28 @@ mod tests {
         let mut env = Environment::new();
         env.declare(String::from("a"), Value::Number(5.0));
         env.declare(String::from("b"), Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))]));
-        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(5.0)));
-        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))])));
+        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(5.0)));
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))])));
 
-        let _ = env.assign(String::from("b"), Value::String_(String::from("abc")), 1);
-        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(5.0)));
-        assert_eq!(env.get(String::from("b"), 1), Ok(Value::String_(String::from("abc"))));
+        let _ = env.assign(String::from("b"), None, Value::String_(String::from("abc")), 1);
+        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(5.0)));
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::String_(String::from("abc"))));
+    }
+
+    #[test]
+    fn one_scope_element() {
+        // var a = [1, true, "abc"]
+        // "a[1] == true?"
+        // a[0] = 5
+        // "a[0] == 5?"
+        // "a == [5, true, "abc"]?"
+        let mut env = Environment::new();
+        env.declare(String::from("a"), Value::Array(vec![Value::Number(1.0), Value::Bool(true), Value::String_(String::from("abc"))]));
+        assert_eq!(env.get(String::from("a"), Some(1), 1), Ok(Value::Bool(true)));
+
+        let _ = env.assign(String::from("a"), Some(0), Value::Number(5.0), 1);
+        assert_eq!(env.get(String::from("a"), Some(0), 1), Ok(Value::Number(5.0)));
+        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Array(vec![Value::Number(5.0), Value::Bool(true), Value::String_(String::from("abc"))])));
     }
 
     #[test]
@@ -96,32 +151,49 @@ mod tests {
         env.declare(String::from("b"), Value::Number(2.0));
 
         env.new_scope();
-        let _ = env.assign(String::from("a"), Value::Number(10.0), 1);
+        let _ = env.assign(String::from("a"), None, Value::Number(10.0), 1);
         env.declare(String::from("b"), Value::Number(20.0));
-        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(10.0)));
-        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(20.0)));
+        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(10.0)));
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(20.0)));
 
         env.new_scope();
-        let _ = env.assign(String::from("b"), Value::Number(30.0), 1);
-        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(30.0)));
+        let _ = env.assign(String::from("b"), None, Value::Number(30.0), 1);
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(30.0)));
 
         env.exit_scope();
-        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(30.0)));
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(30.0)));
 
         env.exit_scope();
-        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(10.0)));
-        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(2.0)));
+        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(10.0)));
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(2.0)));
     }
 
     #[test]
     fn name_error_get() {
         let env = Environment::new();
-        assert_eq!(env.get(String::from("b"), 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
+        assert_eq!(env.get(String::from("b"), None, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
     }
 
     #[test]
     fn name_error_assign() {
         let mut env = Environment::new();
-        assert_eq!(env.assign(String::from("b"), Value::Null, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
+        assert_eq!(env.assign(String::from("b"), None, Value::Null, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
+    }
+
+    #[test]
+    fn declare_twice() {
+        let mut env = Environment::new();
+        env.declare(String::from("b"), Value::Number(123.0));
+        env.declare(String::from("b"), Value::Number(55.0));
+        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(55.0)));
+    }
+
+    #[test]
+    fn get_element_errors() {
+        let mut env = Environment::new();
+        env.declare(String::from("a"), Value::Array(vec![Value::Number(1.0), Value::Bool(true), Value::String_(String::from("abc"))]));
+        env.declare(String::from("b"), Value::Number(123.0));
+        assert_eq!(env.get(String::from("a"), Some(5), 1), Err(ErrorType::IndexError { name: String::from("a"), index: 5, line: 1 }));
+        assert_eq!(env.get(String::from("b"), Some(5), 1), Err(ErrorType::NotIndexable { name: String::from("b"), line: 1 }));
     }
 }
