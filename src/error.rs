@@ -45,6 +45,15 @@ pub enum ErrorType {
         name: String,
         line: usize,
     },
+    NotIndexable {
+        name: String,
+        line: usize,
+    },
+    IndexError {
+        name: String,
+        index: usize,
+        line: usize,
+    },
 }
 
 pub fn report_and_return(type_: &ErrorType) {
@@ -86,7 +95,13 @@ pub fn report_and_return(type_: &ErrorType) {
             println!("Invalid assignment target on line {}.", &line.to_string());
         },
         ErrorType::NameError { ref name, line } => {
-            println!("Line {0}: '{1}' is not defined.", &line.to_string(), name);
+            println!("Line {0}: `{1}` is not defined.", &line.to_string(), name);
         },
+        ErrorType::NotIndexable { ref name, line } => {
+            println!("Line {0}: `{1}` is not indexable.", &line.to_string(), name);
+        },
+        ErrorType::IndexError { ref name, index, line } => {
+            println!("Line {0}: index `{1}` is out of bounds for `{2}`.", &line.to_string(), index, name);
+        }
     }
 }
