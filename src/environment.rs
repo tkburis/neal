@@ -19,7 +19,7 @@ impl Environment {
 
     pub fn exit_scope(&mut self) {
         self.scopes.pop();
-        if self.scopes.len() == 0 {
+        if self.scopes.is_empty() {
             panic!("Exited out of global scope.");
         }
     }

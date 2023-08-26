@@ -1,4 +1,4 @@
-use crate::token::{self, Value};
+use crate::token;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -24,7 +24,8 @@ pub enum Expr {
         arguments: Vec<Expr>,
     },
     Element {  // ? Maybe this should be combined with `Variable`...
-        array: Box<Expr>,  // Should resolve to `Array`.
+        // ! This should probably NOT be combined with `Variable` because e.g., [1,2,3][0] has to evaluate [1,2,3] first.
+        array: Box<Expr>,  // Should resolve to `Array` or `Variable`.
         index: usize,
     },
     Grouping {
@@ -40,21 +41,4 @@ pub enum Expr {
     Variable {
         name: String,  // More specifically, `Token` with `Identifier` type. Let's try String. Formerly Token.
     },
-}
-
-impl Expr {
-    pub fn evaluate(self) -> Value {
-        match self {
-            Expr::Array { elements } => {
-                let values: Vec<Value> = elements.iter().map(|&x| x.evaluate()).collect();
-                Value::Array(values)
-            },
-            Expr::Assignment { target, value } => {
-                
-            },
-            Expr::Binary { left, operator, right } => {},
-            Expr::Call { callee, arguments } => {},
-
-        }
-    }
 }

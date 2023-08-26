@@ -273,18 +273,23 @@ impl Parser {
         if self.check_and_consume(&[TokenType::Equal]).is_some() {
             let value = self.assignment()?;
             
-            match expr {
-                Expr::Element {..} |
-                Expr::Variable {..} => {
-                    Ok(Expr::Assignment {
-                        target: Box::new(expr),
-                        value: Box::new(value),
-                    })
-                },
-                _ => {
-                    Err(ErrorType::InvalidAssignmentTarget { line: self.current_line })
-                }
-            }
+            // ! This might not be necessary because this needs to be checked anyway at runtime.
+            // match expr {
+            //     Expr::Element {..} |
+            //     Expr::Variable {..} => {
+            //         Ok(Expr::Assignment {
+            //             target: Box::new(expr),
+            //             value: Box::new(value),
+            //         })
+            //     },
+            //     _ => {
+            //         Err(ErrorType::InvalidAssignmentTarget { line: self.current_line })
+            //     }
+            // }
+            Ok(Expr::Assignment {
+                target: Box::new(expr),
+                value: Box::new(value),
+            })
         } else {
             Ok(expr)
         }
@@ -522,11 +527,7 @@ impl Parser {
     /// Returns `true` if the next token's type is one of the `expected_types`. Otherwise, or if at end of file, return `false`.
     fn check_next(&self, expected_types: &[TokenType]) -> bool {
         if let Some(token) = self.tokens.get(self.current_index) {
-            if expected_types.contains(&token.type_) {
-                true
-            } else {
-                false
-            }
+            expected_types.contains(&token.type_)
         } else {
             false
         }
