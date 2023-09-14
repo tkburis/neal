@@ -32,6 +32,9 @@ fn main() {
 
 fn run_file(file_path: &str) {
     let source = fs::read_to_string(file_path).expect("Failed to read file.");
+    let mut interpreter = Interpreter::new();
+    
+    run(&source, &mut interpreter);
 }
 
 fn run_prompt() {
@@ -43,7 +46,7 @@ fn run_prompt() {
         io::stdin()
             .read_line(&mut line)
             .expect("Failed to read line");
-        let _ = run(&line, &mut interpreter);
+        run(&line, &mut interpreter);
     }
 }
 
@@ -53,12 +56,12 @@ fn run(source: &str, interpreter: &mut Interpreter) {
         return;
     };
     // println!("TOKENS: {:?}", tokens);
-
+    println!("TOKENS DONE");
     let mut parser = Parser::new(tokens);
     let Ok(ast) = parser.parse() else {
         return;
     };
-    // println!("AST: {:?}", ast);
-
+    // println!("AST: {:#?}", ast);
+    println!("AST DONE");
     interpreter.interpret(ast);
 }

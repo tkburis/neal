@@ -468,20 +468,27 @@ impl Parser {
         let mut expr = self.call()?;  // This is the array.
         
         while self.check_and_consume(&[TokenType::LeftSquare]).is_some() {
-            if let Some(index_token) = self.check_and_consume(&[TokenType::Number]) {
-                if let Literal::Number(float) = index_token.literal {
-                    if float >= 0.0 && float.fract() == 0.0 {
-                        expr = Expr { line: self.current_line, expr_type: ExprType::Element { array: Box::new(expr), index: float as usize }};
-                    } else {
-                        return Err(ErrorType::InvalidIndex { line: self.current_line });
-                    }
-                } else {
-                    return Err(ErrorType::InvalidIndex { line: self.current_line });
+            // if let Some(index_token) = self.check_and_consume(&[TokenType::Number]) {
+            //     if let Literal::Number(float) = index_token.literal {
+            //         if float >= 0.0 && float.fract() == 0.0 {
+            //             expr = Expr { line: self.current_line, expr_type: ExprType::Element { array: Box::new(expr), index: float as usize }};
+            //         } else {
+            //             return Err(ErrorType::InvalidIndex { line: self.current_line });
+            //         }
+            //     } else {
+            //         return Err(ErrorType::InvalidIndex { line: self.current_line });
+            //     }
+            // } else {
+            //     return Err(ErrorType::InvalidIndex { line: self.current_line });
+            // }
+            let index = self.expression()?;
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Element {
+                    array: Box::new(expr),
+                    index: Box::new(index),
                 }
-            } else {
-                return Err(ErrorType::InvalidIndex { line: self.current_line });
-            }
-            
+            };
             self.expect(TokenType::RightSquare, ']')?;
         }
         
@@ -1047,12 +1054,8 @@ mod tests {
     fn error_line_numbers() {
         let source = "\n[[5, a, b, 3+1, \"g\"]";
         assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ']', line: 2 }]));
-        let source = "a[2.3]";
-        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
-        let source = "\na[-2]";
-        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 2 }]));
-        let source = "\n\na[\"abc\"]";
-        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 3 }]));
+        let source = "\n\n[[5, a, b, 3+1, \"g\"]";
+        assert!(errors_in_result(parse(source), vec![ErrorType::ExpectedCharacter { expected: ']', line: 3 }]));
     }
 
     #[test]
@@ -1066,7 +1069,7 @@ mod tests {
         let source = "a[5]";
         assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Element {
             array: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
-            index: 5,
+            index: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) } }),
         }}}}]), parse(source));
     }
     
@@ -1076,20 +1079,10 @@ mod tests {
         assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Element {
             array: Box::new(Expr { line: 1, expr_type: ExprType::Element {
                 array: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
-                index: 1,
+                index: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) } }),
             }}),
-            index: 2,
+            index: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) } }),
         }}}}]), parse(source));
-    }
-    
-    #[test]
-    fn invalid_index() {
-        let source = "a[2.3]";
-        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
-        let source = "a[-2]";
-        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
-        let source = "a[\"abc\"]";
-        assert!(errors_in_result(parse(source), vec![ErrorType::InvalidIndex { line: 1 }]));
     }
 
     #[test]
@@ -1194,11 +1187,10 @@ mod tests {
 
     #[test]
     fn sync() {
-        let source = "var b = a[5.5]\nprint {\nfor (x = 5; x < 2; x = x + 1 {print x}";
+        let source = "print {\nfor (x = 5; x < 2; x = x + 1 {print x}";
         assert!(errors_in_result(parse(source), vec![
-            ErrorType::InvalidIndex { line: 1 },
-            ErrorType::ExpectedExpression { line: 2 },
-            ErrorType::ExpectedParenAfterIncrement { line: 3 },
+            ErrorType::ExpectedExpression { line: 1 },
+            ErrorType::ExpectedParenAfterIncrement { line: 2 },
         ]));
     }
 }

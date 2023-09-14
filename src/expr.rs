@@ -32,7 +32,7 @@ pub enum ExprType {
     Element {  // ? Maybe this should be combined with `Variable`...
         // ! This should probably NOT be combined with `Variable` because e.g., [1,2,3][0] has to evaluate [1,2,3] first.
         array: Box<Expr>,  // Should resolve to `Array` or `Variable`.
-        index: usize,
+        index: Box<Expr>,
     },
     Grouping {
         expression: Box<Expr>,

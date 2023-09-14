@@ -21,11 +21,59 @@ impl Interpreter {
 
     fn execute(&mut self, stmt: &Stmt) -> Result<(), ErrorType> {
         match &stmt.stmt_type {
+            StmtType::Block { body } => {
+                self.environment.new_scope();
+                for block_stmt in body {
+                    self.execute(block_stmt)?;
+                }
+                self.environment.exit_scope();
+                Ok(())
+            },
+            StmtType::Expression { expression } => {
+                self.evaluate(expression)?;
+                Ok(())
+            },
+            StmtType::Function { name, parameters, body } => {
+                todo!();
+                // TODO: BUILTIN FUNCTIONS like append
+            },
+            StmtType::If { condition, then_body, else_body } => {
+                match self.evaluate(condition)? {
+                    Value::Bool(condition_bool) => {
+                        if condition_bool {
+                            self.execute(then_body.as_ref())?;
+                        } else if let Some(else_) = else_body {
+                                self.execute(else_.as_ref())?;
+                        }
+                        Ok(())
+                    },
+                    _ => Err(ErrorType::IfConditionNotBoolean { line: condition.line })
+                }
+            },
             StmtType::Print { expression } => {
                 println!("{}", self.evaluate(expression)?);
                 Ok(())
             },
-            _ => unimplemented!(),
+            StmtType::VarDecl { name, value } => {
+                let value_eval = &self.evaluate(value)?;
+                self.environment.declare(name.clone(), value_eval);
+                Ok(())
+            },
+            StmtType::While { condition, body } => {
+                loop {
+                    self.execute(body.as_ref())?;
+                    let continue_ = match self.evaluate(condition)? {
+                        Value::Bool(condition_bool) => {
+                            condition_bool
+                        },
+                        _ => return Err(ErrorType::WhileConditionNotBoolean { line: stmt.line })
+                    };
+                    if !continue_ {
+                        break;
+                    }
+                }
+                Ok(())
+            }
         }
     }
 
@@ -40,17 +88,18 @@ impl Interpreter {
                 match &target.expr_type {
                     ExprType::Element { array, index } => {
                         match &array.expr_type {
-                            ExprType::Array {..} => {},  // Trying to assign to literal array -> no op
+                            ExprType::Array {..} => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
                             ExprType::Variable { name } => {
-                                self.environment.assign(name.clone(), Some(*index), &value_eval, target.line)?;
+                                let index_num = self.index_expr_to_usize(index.as_ref())?;
+                                self.environment.assign(name.clone(), Some(index_num), &value_eval, target.line)?;
                             },
-                            _ => return Err(ErrorType::ExpressionNotIndexable { line: array.line }),
+                            _ => return Err(ErrorType::NotIndexableError { name: None, line: array.line }),
                         }
                     },
                     ExprType::Variable { name } => {
                         self.environment.assign(name.clone(), None, &value_eval, target.line)?;
                     },
-                    _ => {},
+                    _ => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
                 }
                 Ok(value_eval)
             },
@@ -162,6 +211,28 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             },
+            ExprType::Call { callee, arguments } => {
+                todo!();
+            },
+            ExprType::Element { array, index } => {
+                let index_num = self.index_expr_to_usize(index.as_ref())?;
+                match &array.expr_type {
+                    ExprType::Array { elements } => {
+                        if let Some(element_expr) = elements.get(index_num) {
+                            self.evaluate(element_expr)
+                        } else {
+                            Err(ErrorType::OutOfBoundsIndexError { name: None, index: index_num, line: expr.line })
+                        }
+                    },
+                    ExprType::Variable { name } => {
+                        self.environment.get(name.clone(), Some(index_num), expr.line)
+                    },
+                    _ => Err(ErrorType::NotIndexableError { name: None, line: array.line }),
+                }
+            },
+            ExprType::Grouping { expression } => {
+                self.evaluate(expression.as_ref())
+            },
             ExprType::Literal { value } => {
                 match value {
                     Literal::Number(x) => Ok(Value::Number(*x)),
@@ -169,8 +240,51 @@ impl Interpreter {
                     Literal::Bool(x) => Ok(Value::Bool(*x)),
                     Literal::Null => Ok(Value::Null),
                 }
+            },
+            ExprType::Unary { operator, right } => {
+                let right_eval = self.evaluate(right.as_ref())?;
+
+                match operator.type_ {
+                    TokenType::Bang => {
+                        match right_eval {
+                            Value::Bool(right_bool) => Ok(Value::Bool(!right_bool)),
+                            _ => Err(ErrorType::ExpectedTypeError {
+                                expected: String::from("Boolean"),
+                                got: right_eval.type_to_string(),
+                                line: right.line,
+                            })
+                        }
+                    },
+                    TokenType::Minus => {
+                        match right_eval {
+                            Value::Number(right_num) => Ok(Value::Number(-right_num)),
+                            _ => Err(ErrorType::ExpectedTypeError {
+                                expected: String::from("Number"),
+                                got: right_eval.type_to_string(),
+                                line: right.line,
+                            })
+                        }
+                    },
+                    _ => unreachable!(),
+                }
+            },
+            ExprType::Variable { name } => {
+                self.environment.get(name.clone(), None, expr.line)
             }
-            _ => unimplemented!(),
+        }
+    }
+
+    fn index_expr_to_usize(&mut self, index_expr: &Expr) -> Result<usize, ErrorType> {
+        let index_eval = self.evaluate(index_expr)?;
+        match index_eval {
+            Value::Number(index_num) => {
+                if index_num >= 0.0 && index_num.fract() == 0.0 {
+                    Ok(index_num as usize)
+                } else {
+                    Err(ErrorType::NonNaturalIndexError { got: index_eval, line: index_expr.line })
+                }
+            },
+            _ => Err(ErrorType::NonNumberIndexError { got: index_eval.type_to_string(), line: index_expr.line })
         }
     }
 }

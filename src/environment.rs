@@ -45,11 +45,11 @@ impl Environment {
                                 Ok(element.clone())
                             } else {
                                 // If the index provided is out-of-bounds or similar...
-                                Err(ErrorType::IndexError { name, index: idx, line })
+                                Err(ErrorType::OutOfBoundsIndexError { name: Some(name), index: idx, line })
                             }
                         },
                         // If an index is provided but the value is not an array...
-                        _ => Err(ErrorType::NameNotIndexable { name, line }),
+                        _ => Err(ErrorType::NotIndexableError { name: Some(name), line }),
                     };
                 } else {
                     // No index was provided.
@@ -74,11 +74,11 @@ impl Environment {
                                 Ok(())
                             } else {
                                 // If the index provided is out-of-bounds or similar...
-                                Err(ErrorType::IndexError { name, index: idx, line })
+                                Err(ErrorType::OutOfBoundsIndexError { name: Some(name), index: idx, line })
                             }
                         },
                         // If an index is provided but the value is not an array...
-                        _ => Err(ErrorType::NameNotIndexable { name, line }),
+                        _ => Err(ErrorType::NotIndexableError { name: Some(name), line }),
                     }
                 } else {
                     // No index was provided.
@@ -193,7 +193,7 @@ mod tests {
         let mut env = Environment::new();
         env.declare(String::from("a"), &Value::Array(vec![Value::Number(1.0), Value::Bool(true), Value::String_(String::from("abc"))]));
         env.declare(String::from("b"), &Value::Number(123.0));
-        assert_eq!(env.get(String::from("a"), Some(5), 1), Err(ErrorType::IndexError { name: String::from("a"), index: 5, line: 1 }));
-        assert_eq!(env.get(String::from("b"), Some(5), 1), Err(ErrorType::NameNotIndexable { name: String::from("b"), line: 1 }));
+        assert_eq!(env.get(String::from("a"), Some(5), 1), Err(ErrorType::OutOfBoundsIndexError { name: Some(String::from("a")), index: 5, line: 1 }));
+        assert_eq!(env.get(String::from("b"), Some(5), 1), Err(ErrorType::NotIndexableError { name: Some(String::from("b")), line: 1 }));
     }
 }
