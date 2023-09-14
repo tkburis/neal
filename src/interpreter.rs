@@ -69,17 +69,11 @@ impl Interpreter {
                                     _ => unreachable!(),
                                 }
                             },
-                            (Value::Bool(..), _) => {
-                                Err(ErrorType::ExpectedTypeError {
-                                    expected: String::from("Boolean"),
-                                    got: right_eval.type_to_string(),
-                                    line: right.line,
-                                })
-                            },
                             (_, _) => {
-                                Err(ErrorType::ExpectedTypeError {
+                                Err(ErrorType::BinaryTypeError {
                                     expected: String::from("Boolean"),
-                                    got: left_eval.type_to_string(),
+                                    got_left: left_eval.type_to_string(),
+                                    got_right: right_eval.type_to_string(),
                                     line: left.line,
                                 })
                             }
@@ -112,17 +106,11 @@ impl Interpreter {
                                     _ => unreachable!(),
                                 }
                             },
-                            (Value::Number(..), _) | (Value::String_(..), _) => {
-                                Err(ErrorType::ExpectedTypeError {
-                                    expected: String::from("Boolean or Number"),
-                                    got: right_eval.type_to_string(),
-                                    line: right.line,
-                                })
-                            },
                             (_, _) => {
-                                Err(ErrorType::ExpectedTypeError {
-                                    expected: String::from("Boolean or Number"),
-                                    got: left_eval.type_to_string(),
+                                Err(ErrorType::BinaryTypeError {
+                                    expected: String::from("Number or String"),
+                                    got_left: left_eval.type_to_string(),
+                                    got_right: right_eval.type_to_string(),
                                     line: left.line,
                                 })
                             }
@@ -133,17 +121,11 @@ impl Interpreter {
                         match (&left_eval, &right_eval) {
                             (Value::Number(left_num), Value::Number(right_num)) => Ok(Value::Number(left_num + right_num)),
                             (Value::String_(left_str), Value::String_(right_str)) => Ok(Value::String_(format!("{}{}", left_str, right_str))),
-                            (Value::Number(..), _) | (Value::String_(..), _) => {
-                                Err(ErrorType::ExpectedTypeError {
-                                    expected: String::from("Number or String"),
-                                    got: right_eval.type_to_string(),
-                                    line: right.line,
-                                })
-                            },
                             (_, _) => {
-                                Err(ErrorType::ExpectedTypeError {
+                                Err(ErrorType::BinaryTypeError {
                                     expected: String::from("Number or String"),
-                                    got: left_eval.type_to_string(),
+                                    got_left: left_eval.type_to_string(),
+                                    got_right: right_eval.type_to_string(),
                                     line: left.line,
                                 })
                             }
@@ -167,17 +149,11 @@ impl Interpreter {
                                     _ => unreachable!(),
                                 }
                             },
-                            (Value::Number(..), _) => {
-                                Err(ErrorType::ExpectedTypeError {
-                                    expected: String::from("Number"),
-                                    got: right_eval.type_to_string(),
-                                    line: right.line,
-                                })
-                            },
                             (_, _) => {
-                                Err(ErrorType::ExpectedTypeError {
+                                Err(ErrorType::BinaryTypeError {
                                     expected: String::from("Number"),
-                                    got: left_eval.type_to_string(),
+                                    got_left: left_eval.type_to_string(),
+                                    got_right: right_eval.type_to_string(),
                                     line: left.line,
                                 })
                             }

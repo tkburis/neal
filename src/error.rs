@@ -68,6 +68,8 @@ pub enum ErrorType {
     },
     BinaryTypeError {
         expected: String,
+        got_left: String,
+        got_right: String,
         line: usize,
     },
     ExpressionNotIndexable {
@@ -131,8 +133,8 @@ pub fn report(type_: &ErrorType) {
         ErrorType::TypeMismatchError { ref left, ref right, line } => {
             println!("Types for expression on line {0} are mismatched: left is {1}; right is {2}.", &line.to_string(), left, right);
         },
-        ErrorType::BinaryTypeError { ref expected, line } => {
-            println!("Line {0}: this operation requires both sides' types to be {1}.", &line.to_string(), expected);
+        ErrorType::BinaryTypeError { ref expected, ref got_left, ref got_right, line } => {
+            println!("Line {0}: this operation requires both sides' types to be {1}. Instead, got {2} and {3} respectively.", &line.to_string(), expected, got_left, got_right);
         },
         ErrorType::ExpressionNotIndexable { line } => {
             println!("Line {0}: the expression is not indexable.", &line.to_string());

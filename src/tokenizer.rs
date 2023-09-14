@@ -1,4 +1,4 @@
-use crate::{token::{Token, TokenType, Literal, self}, error::{self, ErrorType}};
+use crate::{token::{Token, TokenType, Literal}, error::{self, ErrorType}};
 
 #[derive(Debug)]
 enum State {

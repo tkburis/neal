@@ -13,11 +13,10 @@ use std::io::Write;
 use std::process;
 use std::fs;
 
-use error::ErrorType;
 use parser::Parser;
 use tokenizer::Tokenizer;
 
-use crate::interpreter::Interpreter;
+use interpreter::Interpreter;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -36,6 +35,7 @@ fn run_file(file_path: &str) {
 }
 
 fn run_prompt() {
+    let mut interpreter = Interpreter::new();
     loop {
         print!("> ");
         io::stdout().flush().expect("Flush failed");  // to flush out "> "
@@ -43,23 +43,22 @@ fn run_prompt() {
         io::stdin()
             .read_line(&mut line)
             .expect("Failed to read line");
-        let _ = run(&line);
+        let _ = run(&line, &mut interpreter);
     }
 }
 
-fn run(source: &str) {
+fn run(source: &str, interpreter: &mut Interpreter) {
     let mut tokenizer = Tokenizer::new(source);
     let Ok(tokens) = tokenizer.tokenize() else {
         return;
     };
-    println!("TOKENS: {:?}", tokens);
+    // println!("TOKENS: {:?}", tokens);
 
     let mut parser = Parser::new(tokens);
     let Ok(ast) = parser.parse() else {
         return;
     };
-    println!("AST: {:?}", ast);
+    // println!("AST: {:?}", ast);
 
-    let mut interpreter = Interpreter::new();
     interpreter.interpret(ast);
 }
