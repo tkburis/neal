@@ -17,6 +17,8 @@ use error::ErrorType;
 use parser::Parser;
 use tokenizer::Tokenizer;
 
+use crate::interpreter::Interpreter;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 2 {
@@ -57,4 +59,7 @@ fn run(source: &str) {
         return;
     };
     println!("AST: {:?}", ast);
+
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret(ast);
 }

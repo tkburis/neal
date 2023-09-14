@@ -1,4 +1,4 @@
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ErrorType {
     // Tokenizing errors.
     UnexpectedCharacter {
@@ -45,7 +45,7 @@ pub enum ErrorType {
         name: String,
         line: usize,
     },
-    NotIndexable {
+    NameNotIndexable {
         name: String,
         line: usize,
     },
@@ -54,9 +54,31 @@ pub enum ErrorType {
         index: usize,
         line: usize,
     },
+
+    // Runtime errors.
+    ExpectedTypeError {
+        expected: String,
+        got: String,
+        line: usize,
+    },
+    TypeMismatchError {
+        left: String,
+        right: String,
+        line: usize,
+    },
+    BinaryTypeError {
+        expected: String,
+        line: usize,
+    },
+    ExpressionNotIndexable {
+        line: usize,
+    },
+    DivideByZero {
+        line: usize,
+    },
 }
 
-pub fn report_and_return(type_: &ErrorType) {
+pub fn report(type_: &ErrorType) {
     match type_ {
         ErrorType::UnexpectedCharacter { character, line } => {
             println!("Unexpected character `{0}` on line {1}.", &character.to_string(), &line.to_string());
@@ -97,11 +119,26 @@ pub fn report_and_return(type_: &ErrorType) {
         ErrorType::NameError { ref name, line } => {
             println!("Line {0}: `{1}` is not defined.", &line.to_string(), name);
         },
-        ErrorType::NotIndexable { ref name, line } => {
+        ErrorType::NameNotIndexable { ref name, line } => {
             println!("Line {0}: `{1}` is not indexable.", &line.to_string(), name);
         },
         ErrorType::IndexError { ref name, index, line } => {
             println!("Line {0}: index `{1}` is out of bounds for `{2}`.", &line.to_string(), index, name);
-        }
+        },
+        ErrorType::ExpectedTypeError { ref expected, ref got, line } => {
+            println!("Expected type {0}, instead got type {1} on line {2}.", expected, got, &line.to_string());
+        },
+        ErrorType::TypeMismatchError { ref left, ref right, line } => {
+            println!("Types for expression on line {0} are mismatched: left is {1}; right is {2}.", &line.to_string(), left, right);
+        },
+        ErrorType::BinaryTypeError { ref expected, line } => {
+            println!("Line {0}: this operation requires both sides' types to be {1}.", &line.to_string(), expected);
+        },
+        ErrorType::ExpressionNotIndexable { line } => {
+            println!("Line {0}: the expression is not indexable.", &line.to_string());
+        },
+        ErrorType::DivideByZero { line } => {
+            println!("Divisor is 0 on line {0}", &line.to_string());
+        },
     }
 }

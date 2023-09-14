@@ -65,7 +65,7 @@ impl<'a> Tokenizer<'a> {
                     }
                 },
                 Err(error) => {
-                    error::report_and_return(&error);
+                    error::report(&error);
                     return Err(error);
                 }
             }

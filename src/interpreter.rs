@@ -1,4 +1,4 @@
-use crate::{environment::Environment, expr::Expr, token::Value, error::ErrorType};
+use crate::{environment::Environment, expr::{Expr, ExprType}, token::{Value, TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}};
 
 pub struct Interpreter {
     environment: Environment,
@@ -11,33 +11,190 @@ impl Interpreter {
         }
     }
 
-    fn evaluate(&mut self, expr: &Expr) -> Result<Value, ErrorType> {
-        match expr {
-            Expr::Array { elements } => {
-                let values: Vec<Value> = elements.iter().map(|x| self.evaluate(x)).collect()?;
-                Ok(Value::Array(values))
+    pub fn interpret(&mut self, ast: Vec<Stmt>) {
+        for stmt in &ast {
+            if let Err(e) = self.execute(stmt) {
+                error::report(&e);
+            }
+        }
+    }
+
+    fn execute(&mut self, stmt: &Stmt) -> Result<(), ErrorType> {
+        match &stmt.stmt_type {
+            StmtType::Print { expression } => {
+                println!("{}", self.evaluate(expression)?);
+                Ok(())
             },
-            Expr::Assignment { target, value } => {
-                let value_eval = self.evaluate(value)?;
-                match **target {
-                    Expr::Element { array, index } => {
-                        match *array {
-                            Expr::Array { elements } => (),
-                            Expr::Variable { name } => {
-                                self.environment.assign(name, Some(index))
-                            }
+            _ => unimplemented!(),
+        }
+    }
+
+    fn evaluate(&mut self, expr: &Expr) -> Result<Value, ErrorType> {
+        match &expr.expr_type {
+            ExprType::Array { elements } => {
+                let values: Result<Vec<Value>, _> = elements.iter().map(|x| self.evaluate(x)).collect();
+                Ok(Value::Array(values?))
+            },
+            ExprType::Assignment { target, value } => {
+                let value_eval = self.evaluate(value.as_ref())?;
+                match &target.expr_type {
+                    ExprType::Element { array, index } => {
+                        match &array.expr_type {
+                            ExprType::Array {..} => {},  // Trying to assign to literal array -> no op
+                            ExprType::Variable { name } => {
+                                self.environment.assign(name.clone(), Some(*index), &value_eval, target.line)?;
+                            },
+                            _ => return Err(ErrorType::ExpressionNotIndexable { line: array.line }),
                         }
                     },
-                    Expr::Variable { name } => {
-
+                    ExprType::Variable { name } => {
+                        self.environment.assign(name.clone(), None, &value_eval, target.line)?;
                     },
                     _ => {},
                 }
-                self.environment.assign(name, index, value, line)
+                Ok(value_eval)
             },
-            Expr::Binary { left, operator, right } => {},
-            Expr::Call { callee, arguments } => {},
+            ExprType::Binary { left, operator, right } => {
+                let left_eval = self.evaluate(left.as_ref())?;
+                let right_eval = self.evaluate(right.as_ref())?;
 
+                match operator.type_ {
+                    TokenType::Or |
+                    TokenType::And => {
+                        match (&left_eval, &right_eval) {
+                            (Value::Bool(left_bool), Value::Bool(right_bool)) => {
+                                match operator.type_ {
+                                    TokenType::Or => Ok(Value::Bool(*left_bool || *right_bool)),
+                                    TokenType::And => Ok(Value::Bool(*left_bool && *right_bool)),
+                                    _ => unreachable!(),
+                                }
+                            },
+                            (Value::Bool(..), _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Boolean"),
+                                    got: right_eval.type_to_string(),
+                                    line: right.line,
+                                })
+                            },
+                            (_, _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Boolean"),
+                                    got: left_eval.type_to_string(),
+                                    line: left.line,
+                                })
+                            }
+                        }
+                    },
+
+                    TokenType::EqualEqual => Ok(Value::Bool(left_eval == right_eval)),
+                    TokenType::BangEqual => Ok(Value::Bool(left_eval != right_eval)),
+
+                    TokenType::Greater |
+                    TokenType::Less |
+                    TokenType::GreaterEqual |
+                    TokenType::LessEqual => {
+                        match (&left_eval, &right_eval) {
+                            (Value::Number(left_num), Value::Number(right_num)) => {
+                                match operator.type_ {
+                                    TokenType::Greater => Ok(Value::Bool(left_num > right_num)),
+                                    TokenType::Less => Ok(Value::Bool(left_num < right_num)),
+                                    TokenType::GreaterEqual => Ok(Value::Bool(left_num >= right_num)),
+                                    TokenType::LessEqual => Ok(Value::Bool(left_num <= right_num)),
+                                    _ => unreachable!(),
+                                }
+                            },
+                            (Value::String_(left_str), Value::String_(right_str)) => {
+                                match operator.type_ {
+                                    TokenType::Greater => Ok(Value::Bool(left_str > right_str)),
+                                    TokenType::Less => Ok(Value::Bool(left_str < right_str)),
+                                    TokenType::GreaterEqual => Ok(Value::Bool(left_str >= right_str)),
+                                    TokenType::LessEqual => Ok(Value::Bool(left_str <= right_str)),
+                                    _ => unreachable!(),
+                                }
+                            },
+                            (Value::Number(..), _) | (Value::String_(..), _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Boolean or Number"),
+                                    got: right_eval.type_to_string(),
+                                    line: right.line,
+                                })
+                            },
+                            (_, _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Boolean or Number"),
+                                    got: left_eval.type_to_string(),
+                                    line: left.line,
+                                })
+                            }
+                        }
+                    },
+
+                    TokenType::Plus => {
+                        match (&left_eval, &right_eval) {
+                            (Value::Number(left_num), Value::Number(right_num)) => Ok(Value::Number(left_num + right_num)),
+                            (Value::String_(left_str), Value::String_(right_str)) => Ok(Value::String_(format!("{}{}", left_str, right_str))),
+                            (Value::Number(..), _) | (Value::String_(..), _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Number or String"),
+                                    got: right_eval.type_to_string(),
+                                    line: right.line,
+                                })
+                            },
+                            (_, _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Number or String"),
+                                    got: left_eval.type_to_string(),
+                                    line: left.line,
+                                })
+                            }
+                        }
+                    },
+                    TokenType::Minus |
+                    TokenType::Star |
+                    TokenType::Slash => {
+                        match (&left_eval, &right_eval) {
+                            (Value::Number(left_num), Value::Number(right_num)) => {
+                                match operator.type_ {
+                                    TokenType::Minus => Ok(Value::Number(left_num - right_num)),
+                                    TokenType::Star => Ok(Value::Number(left_num * right_num)),
+                                    TokenType::Slash => {
+                                        if *right_num == 0.0 {
+                                            Err(ErrorType::DivideByZero { line: right.line })
+                                        } else {
+                                            Ok(Value::Number(left_num / right_num))
+                                        }
+                                    },
+                                    _ => unreachable!(),
+                                }
+                            },
+                            (Value::Number(..), _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Number"),
+                                    got: right_eval.type_to_string(),
+                                    line: right.line,
+                                })
+                            },
+                            (_, _) => {
+                                Err(ErrorType::ExpectedTypeError {
+                                    expected: String::from("Number"),
+                                    got: left_eval.type_to_string(),
+                                    line: left.line,
+                                })
+                            }
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            },
+            ExprType::Literal { value } => {
+                match value {
+                    Literal::Number(x) => Ok(Value::Number(*x)),
+                    Literal::String_(x) => Ok(Value::String_(x.clone())),
+                    Literal::Bool(x) => Ok(Value::Bool(*x)),
+                    Literal::Null => Ok(Value::Null),
+                }
+            }
+            _ => unimplemented!(),
         }
     }
 }

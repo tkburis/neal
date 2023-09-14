@@ -1,7 +1,13 @@
 use crate::expr::Expr;
 
 #[derive(Debug, PartialEq)]
-pub enum Stmt {
+pub struct Stmt {
+    pub line: usize,
+    pub stmt_type: StmtType,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum StmtType {
     Block {
         body: Vec<Stmt>,
     },

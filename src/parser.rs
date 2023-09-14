@@ -1,6 +1,6 @@
 use crate::error::{ErrorType, self};
-use crate::expr::Expr;
-use crate::stmt::Stmt;
+use crate::expr::{Expr, ExprType};
+use crate::stmt::{Stmt, StmtType};
 use crate::token::{Token, TokenType, Literal};
 
 pub struct Parser {
@@ -33,7 +33,7 @@ impl Parser {
             }
         }
         for error in &errors {
-            error::report_and_return(error);
+            error::report(error);
         }
 
         if errors.is_empty() {
@@ -75,7 +75,10 @@ impl Parser {
         } else if self.check_and_consume(&[TokenType::While]).is_some() {
             self.while_()
         } else {
-            Ok(Stmt::Expression { expression: self.expression()? })
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::Expression { expression: self.expression()? }
+            })
         }
     }
 
@@ -89,7 +92,10 @@ impl Parser {
         }
 
         self.expect(TokenType::RightCurly, '}')?;
-        Ok(Stmt::Block { body: statements })
+        Ok(Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::Block { body: statements }
+        })
     }
 
     fn for_(&mut self) -> Result<Stmt, ErrorType> {
@@ -106,7 +112,7 @@ impl Parser {
             return Err(ErrorType::ExpectedSemicolonAfterInit { line: self.current_line });
         }
 
-        let mut condition = Expr::Literal { value: Literal::Bool(true) };  // If there is no given condition, always `true`.
+        let mut condition = Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Bool(true) }};  // If there is no given condition, always `true`.
         if !self.check_next(&[TokenType::Semicolon]) {
             condition = self.expression()?;
         }
@@ -142,15 +148,24 @@ impl Parser {
             while_body_vec.push(inc);
         }
 
-        let while_body = Stmt::Block { body: while_body_vec };
-
-        let while_loop = Stmt::While {
-            condition,
-            body: Box::new(while_body)
+        let while_body = Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::Block { body: while_body_vec }
         };
 
+        let while_loop = Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::While {
+                condition,
+                body: Box::new(while_body)
+            }
+        };
+        // TODO: Good place for a flow chart!
         if let Some(init) = initialiser {
-            Ok(Stmt::Block { body: vec![init, while_loop] })
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::Block { body: vec![init, while_loop] }
+            })
         } else {
             Ok(while_loop)
         }
@@ -179,10 +194,13 @@ impl Parser {
 
             let body = self.block()?;
 
-            Ok(Stmt::Function {
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::Function {
                 name: identifier.lexeme,
                 parameters,
                 body: Box::new(body),
+                }
             })
         } else {
             Err(ErrorType::ExpectedFunctionName { line: self.current_line })
@@ -198,16 +216,22 @@ impl Parser {
         
         if self.check_and_consume(&[TokenType::Else]).is_some() {
             let else_body = self.else_body()?;
-            Ok(Stmt::If {
-                condition,
-                then_body: Box::new(then_body),
-                else_body: Some(Box::new(else_body)),
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::If {
+                    condition,
+                    then_body: Box::new(then_body),
+                    else_body: Some(Box::new(else_body)),
+                }
             })
         } else {
-            Ok(Stmt::If {
-                condition,
-                then_body: Box::new(then_body),
-                else_body: None,
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::If {
+                    condition,
+                    then_body: Box::new(then_body),
+                    else_body: None,
+                }
             })
         }
     }
@@ -224,11 +248,17 @@ impl Parser {
     }
 
     fn print(&mut self) -> Result<Stmt, ErrorType> {
-        Ok(Stmt::Print { expression: self.expression()? })
+        Ok(Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::Print { expression: self.expression()? }
+        })
     }
 
     fn return_(&mut self) -> Result<Stmt, ErrorType> {
-        Ok(Stmt::Print { expression: self.expression()? })
+        Ok(Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::Print { expression: self.expression()? }
+        })
     }
 
     fn var(&mut self) -> Result<Stmt, ErrorType> {
@@ -236,9 +266,12 @@ impl Parser {
             self.expect(TokenType::Equal, '=')?;
             
             let value = self.expression()?;
-            Ok(Stmt::VarDecl {
-                name: identifier.lexeme,
-                value,
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::VarDecl {
+                    name: identifier.lexeme,
+                    value,
+                }
             })
         } else {
             Err(ErrorType::ExpectedVariableName { line: self.current_line })
@@ -252,9 +285,12 @@ impl Parser {
 
         let body = self.block()?;
 
-        Ok(Stmt::While {
-            condition,
-            body: Box::new(body),
+        Ok(Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::While {
+                condition,
+                body: Box::new(body),
+            }
         })
     }
 
@@ -286,9 +322,12 @@ impl Parser {
             //         Err(ErrorType::InvalidAssignmentTarget { line: self.current_line })
             //     }
             // }
-            Ok(Expr::Assignment {
-                target: Box::new(expr),
-                value: Box::new(value),
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Assignment {
+                    target: Box::new(expr),
+                    value: Box::new(value),
+                }
             })
         } else {
             Ok(expr)
@@ -303,10 +342,13 @@ impl Parser {
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Or]) {
             let right = self.and()?;
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Binary {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(right),
+                }
             };
         }
         Ok(expr)
@@ -318,10 +360,13 @@ impl Parser {
 
         while let Some(operator) = self.check_and_consume(&[TokenType::And]) {
             let right = self.equality()?;
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Binary {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(right),
+                }
             };
         }
         Ok(expr)
@@ -334,10 +379,13 @@ impl Parser {
 
         while let Some(operator) = self.check_and_consume(&[TokenType::EqualEqual, TokenType::BangEqual]) {
             let right = self.comparison()?;
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Binary {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(right),
+                }
             };
         }
         Ok(expr)
@@ -349,10 +397,13 @@ impl Parser {
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Greater, TokenType::Less, TokenType::GreaterEqual, TokenType::LessEqual]) {
             let right = self.addsub()?;
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Binary {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(right),
+                }
             };
         }
         Ok(expr)
@@ -364,10 +415,13 @@ impl Parser {
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Plus, TokenType::Minus]) {
             let right = self.multdiv()?;
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Binary {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(right),
+                }
             };
         }
         Ok(expr)
@@ -379,10 +433,13 @@ impl Parser {
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Star, TokenType::Slash]) {
             let right = self.unary()?;
-            expr = Expr::Binary {
-                left: Box::new(expr),
-                operator,
-                right: Box::new(right),
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Binary {
+                    left: Box::new(expr),
+                    operator,
+                    right: Box::new(right),
+                }
             };
         }
         Ok(expr)
@@ -394,9 +451,12 @@ impl Parser {
     fn unary(&mut self) -> Result<Expr, ErrorType> {
         if let Some(operator) = self.check_and_consume(&[TokenType::Bang, TokenType::Minus]) {
             let right = self.unary()?;
-            Ok(Expr::Unary {
-                operator,
-                right: Box::new(right),
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Unary {
+                    operator,
+                    right: Box::new(right),
+                }
             })
         } else {
             self.element()
@@ -411,7 +471,7 @@ impl Parser {
             if let Some(index_token) = self.check_and_consume(&[TokenType::Number]) {
                 if let Literal::Number(float) = index_token.literal {
                     if float >= 0.0 && float.fract() == 0.0 {
-                        expr = Expr::Element { array: Box::new(expr), index: float as usize };
+                        expr = Expr { line: self.current_line, expr_type: ExprType::Element { array: Box::new(expr), index: float as usize }};
                     } else {
                         return Err(ErrorType::InvalidIndex { line: self.current_line });
                     }
@@ -448,9 +508,12 @@ impl Parser {
 
             self.expect(TokenType::RightParen, ')')?;
 
-            expr = Expr::Call {
-                callee: Box::new(expr),
-                arguments,
+            expr = Expr {
+                line: self.current_line,
+                expr_type: ExprType::Call {
+                    callee: Box::new(expr),
+                    arguments,
+                }
             }
         }
 
@@ -464,22 +527,22 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr, ErrorType> {
         if self.check_and_consume(&[TokenType::True]).is_some() {
             // Literals.
-            Ok(Expr::Literal { value: Literal::Bool(true) })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Bool(true) }})
 
         } else if self.check_and_consume(&[TokenType::False]).is_some() {
-            Ok(Expr::Literal { value: Literal::Bool(false) })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Bool(false) }})
 
         } else if self.check_and_consume(&[TokenType::Null]).is_some() {
-            Ok(Expr::Literal { value: Literal::Null })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Null }})
 
         } else if let Some(token) = self.check_and_consume(&[TokenType::String_, TokenType::Number]) {
-            Ok(Expr::Literal { value: token.literal })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: token.literal }})
 
         } else if self.check_and_consume(&[TokenType::LeftParen]).is_some() {
             // Grouping.
             let expr = self.expression()?;
             self.expect(TokenType::RightParen, ')')?;
-            Ok(Expr::Grouping { expression: Box::new(expr) })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Grouping { expression: Box::new(expr) }})
 
         } else if self.check_and_consume(&[TokenType::LeftSquare]).is_some() {
             // Array.
@@ -497,11 +560,11 @@ impl Parser {
             }
 
             self.expect(TokenType::RightSquare, ']')?;
-            Ok(Expr::Array { elements })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Array { elements }})
 
         } else if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
             // Variable.
-            Ok(Expr::Variable { name: identifier.lexeme })
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Variable { name: identifier.lexeme }})
 
         } else {
             // TODO: This should probably say which character it found as well. E.g., input '{'
@@ -547,7 +610,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::{token, expr::Expr, error::ErrorType, tokenizer::Tokenizer, stmt::Stmt};
+    use crate::{token, expr::{Expr, ExprType}, error::ErrorType, tokenizer::Tokenizer, stmt::Stmt, stmt::StmtType};
 
     use super::Parser;
 
@@ -573,143 +636,143 @@ mod tests {
     #[test]
     fn for_() {
         let source = "for (var x = 5; x < 10; x = x + 1) {var y = x}";
-        assert_eq!(Ok(vec![Stmt::Block {
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Block {
             body: vec![
-                Stmt::VarDecl {
+                Stmt { line: 1, stmt_type: StmtType::VarDecl {
                     name: String::from("x"),
-                    value: Expr::Literal { value: token::Literal::Number(5.0) },
-                },
-                Stmt::While {
-                    condition: Expr::Binary {
-                        left: Box::new(Expr::Variable { name: String::from("x") }),
+                    value: Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }},
+                }},
+                Stmt { line: 1, stmt_type: StmtType::While {
+                    condition: Expr { line: 1, expr_type: ExprType::Binary {
+                        left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
                         operator: token::Token { type_: token::TokenType::Less, lexeme: String::from("<"), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Literal { value: token::Literal::Number(10.0) }),
-                    },
-                    body: Box::new(Stmt::Block {
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(10.0) }}),
+                    }},
+                    body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block {
                         body: vec![
-                            Stmt::Block {
+                            Stmt { line: 1, stmt_type: StmtType::Block {
                                 body: vec![
-                                    Stmt::VarDecl {
+                                    Stmt { line: 1, stmt_type: StmtType::VarDecl {
                                         name: String::from("y"),
-                                        value: Expr::Variable { name: String::from("x") },
-                                    },
+                                        value: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }},
+                                    }},
                                 ],
-                            },
-                            Stmt::Expression { expression: Expr::Assignment {
-                                target: Box::new(Expr::Variable { name: String::from("x") }),
-                                value: Box::new(Expr::Binary {
-                                    left: Box::new(Expr::Variable { name: String::from("x") }),
-                                    operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-                                    right: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
-                                }),
                             }},
+                            Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Assignment {
+                                target: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
+                                value: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                                    left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
+                                    operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
+                                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
+                                }}),
+                            }}}},
                         ],
-                    }),
-                },
+                    }}),
+                }},
             ]
-        }]), parse(source));
+        }}]), parse(source));
     }
     
     #[test]
     fn for_no_init() {
         let source = "for (; x < 10; x = x + 1) {var y = x}";
         assert_eq!(Ok(vec![
-            Stmt::While {
-                condition: Expr::Binary {
-                    left: Box::new(Expr::Variable { name: String::from("x") }),
+            Stmt { line: 1, stmt_type: StmtType::While {
+                condition: Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
                     operator: token::Token { type_: token::TokenType::Less, lexeme: String::from("<"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal { value: token::Literal::Number(10.0) }),
-                },
-                body: Box::new(Stmt::Block {
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(10.0) }}),
+                }},
+                body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block {
                     body: vec![
-                        Stmt::Block {
+                        Stmt { line: 1, stmt_type: StmtType::Block {
                             body: vec![
-                                Stmt::VarDecl {
+                                Stmt { line: 1, stmt_type: StmtType::VarDecl {
                                     name: String::from("y"),
-                                    value: Expr::Variable { name: String::from("x") },
-                                },
+                                    value: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }},
+                                }},
                             ],
-                        },
-                        Stmt::Expression { expression: Expr::Assignment {
-                            target: Box::new(Expr::Variable { name: String::from("x") }),
-                            value: Box::new(Expr::Binary {
-                                left: Box::new(Expr::Variable { name: String::from("x") }),
-                                operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-                                right: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
-                            }),
                         }},
+                        Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Assignment {
+                            target: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
+                            value: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                                left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
+                                operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
+                                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
+                            }}),
+                        }}}},
                     ],
-                }),
-            },
+                }}),
+            }},
         ]), parse(source));
     }
     
     #[test]
     fn for_no_cond() {
         let source = "for (var x = 5;; x = x + 1) {var y = x}";
-        assert_eq!(Ok(vec![Stmt::Block {
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Block {
             body: vec![
-                Stmt::VarDecl {
+                Stmt { line: 1, stmt_type: StmtType::VarDecl {
                     name: String::from("x"),
-                    value: Expr::Literal { value: token::Literal::Number(5.0) },
-                },
-                Stmt::While {
-                    condition: Expr::Literal { value: token::Literal::Bool(true) },
-                    body: Box::new(Stmt::Block {
+                    value: Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }},
+                }},
+                Stmt { line: 1, stmt_type: StmtType::While {
+                    condition: Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Bool(true) }},
+                    body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block {
                         body: vec![
-                            Stmt::Block {
+                            Stmt { line: 1, stmt_type: StmtType::Block {
                                 body: vec![
-                                    Stmt::VarDecl {
+                                    Stmt { line: 1, stmt_type: StmtType::VarDecl {
                                         name: String::from("y"),
-                                        value: Expr::Variable { name: String::from("x") },
-                                    },
+                                        value: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }},
+                                    }},
                                 ],
-                            },
-                            Stmt::Expression { expression: Expr::Assignment {
-                                target: Box::new(Expr::Variable { name: String::from("x") }),
-                                value: Box::new(Expr::Binary {
-                                    left: Box::new(Expr::Variable { name: String::from("x") }),
-                                    operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-                                    right: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
-                                }),
                             }},
+                            Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Assignment {
+                                target: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
+                                value: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                                    left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
+                                    operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
+                                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
+                                }}),
+                            }}}},
                         ],
-                    }),
-                },
+                    }}),
+                }},
             ]
-        }]), parse(source));
+        }}]), parse(source));
     }
     
     #[test]
     fn for_no_inc() {
         let source = "for (var x = 5; x < 10;) {var y = x}";
-        assert_eq!(Ok(vec![Stmt::Block {
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Block {
             body: vec![
-                Stmt::VarDecl {
+                Stmt { line: 1, stmt_type: StmtType::VarDecl {
                     name: String::from("x"),
-                    value: Expr::Literal { value: token::Literal::Number(5.0) },
-                },
-                Stmt::While {
-                    condition: Expr::Binary {
-                        left: Box::new(Expr::Variable { name: String::from("x") }),
+                    value: Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }},
+                }},
+                Stmt { line: 1, stmt_type: StmtType::While {
+                    condition: Expr { line: 1, expr_type: ExprType::Binary {
+                        left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }}),
                         operator: token::Token { type_: token::TokenType::Less, lexeme: String::from("<"), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Literal { value: token::Literal::Number(10.0) }),
-                    },
-                    body: Box::new(Stmt::Block {
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(10.0) }}),
+                    }},
+                    body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block {
                         body: vec![
-                            Stmt::Block {
+                            Stmt { line: 1, stmt_type: StmtType::Block {
                                 body: vec![
-                                    Stmt::VarDecl {
+                                    Stmt { line: 1, stmt_type: StmtType::VarDecl {
                                         name: String::from("y"),
-                                        value: Expr::Variable { name: String::from("x") },
-                                    },
+                                        value: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("x") }},
+                                    }},
                                 ],
-                            },
+                            }},
                         ],
-                    }),
-                },
+                    }}),
+                }},
             ]
-        }]), parse(source));
+        }}]), parse(source));
     }
     
     #[test]
@@ -745,14 +808,14 @@ mod tests {
     #[test]
     fn func() {
         let source = "func hello(a, b) {print a print b}";
-        assert_eq!(Ok(vec![Stmt::Function {
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Function {
             name: String::from("hello"),
             parameters: vec![String::from("a"), String::from("b")],
-            body: Box::new(Stmt::Block { body: vec![
-                Stmt::Print { expression: Expr::Variable { name: String::from("a") }},
-                Stmt::Print { expression: Expr::Variable { name: String::from("b") }},
-            ]}),
-        }]), parse(source));
+            body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![
+                Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}}},
+                Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("b") }}}},
+            ]}}),
+        }}]), parse(source));
     }
 
     #[test]
@@ -764,97 +827,97 @@ mod tests {
     #[test]
     fn if_() {
         let source = "if (a == 2) {print a}";
-        assert_eq!(Ok(vec![Stmt::If {
-            condition: Expr::Binary {
-                left: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::If {
+            condition: Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                 operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
-            },
-            then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("a") } }] }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
+            }},
+            then_body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") } }}}] }}),
             else_body: None,
-        }]), parse(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn else_if() {
         let source = "if (a == 2) {print a} else if (a == 3) {print b} else if (a == 4) {print c}";
-        assert_eq!(Ok(vec![Stmt::If {
-            condition: Expr::Binary {
-                left: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::If {
+            condition: Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                 operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
-            },
-            then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("a") } }] }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
+            }},
+            then_body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") } }}}] }}),
             else_body: Some(Box::new(
-                Stmt::If {
-                    condition: Expr::Binary {
-                        left: Box::new(Expr::Variable { name: String::from("a") }),
+                Stmt { line: 1, stmt_type: StmtType::If {
+                    condition: Expr { line: 1, expr_type: ExprType::Binary {
+                        left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                         operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
-                    },
-                    then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] }),
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) }}),
+                    }},
+                    then_body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("b") } }}}]} }),
                     else_body: Some(Box::new(
-                        Stmt::If {
-                            condition: Expr::Binary {
-                                left: Box::new(Expr::Variable { name: String::from("a") }),
+                        Stmt { line: 1, stmt_type: StmtType::If {
+                            condition: Expr { line: 1, expr_type: ExprType::Binary {
+                                left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                                 operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                                right: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
-                            },
-                            then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("c") } }] }),
+                                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(4.0) }}),
+                            }},
+                            then_body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("c") } }}}]} }),
                             else_body: None,
-                        }
+                        }}
                     )),
-                }
+                }}
             )),
-        }]), parse(source));
+        }}]), parse(source));
     }
 
     #[test]
     fn else_() {
         let source = "if (a == 2) {print a} else {print b}";
-        assert_eq!(Ok(vec![Stmt::If {
-            condition: Expr::Binary {
-                left: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::If {
+            condition: Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                 operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
-            },
-            then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("a") } }] }),
-            else_body: Some(Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] })),
-        }]), parse(source));
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
+            }},
+            then_body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") } }}}]} }),
+            else_body: Some(Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("b") } }}}]} })),
+        }}]), parse(source));
     }
 
     #[test]
     fn print() {
         let source = "print 5*1+2*(3-4/a)";
-        assert_eq!(Ok(vec![Stmt::Print { expression: Expr::Binary {
-            left: Box::new(Expr::Binary {
-                left: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Binary {
+            left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }}),
                 operator: token::Token { type_: token::TokenType::Star, lexeme: String::from("*"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
-            }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
+            }}),
             operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-            right: Box::new(Expr::Binary {
-                left: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
+            right: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
                 operator: token::Token { type_: token::TokenType::Star, lexeme: String::from("*"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Grouping {
-                    expression: Box::new(Expr::Binary {
-                        left: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Grouping {
+                    expression: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                        left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) }}),
                         operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Binary {
-                            left: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                            left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(4.0) }}),
                             operator: token::Token { type_: token::TokenType::Slash, lexeme: String::from("/"), literal: token::Literal::Null, line: 1 },
-                            right: Box::new(Expr::Variable { name: String::from("a") }),
-                        }),
-                    }),
-                }),
-            }),
-        }}]), parse(source));
+                            right: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
+                        }}),
+                    }}),
+                }}),
+            }}),
+        }}}}]), parse(source));
     }
 
     #[test]
     fn var() {
         let source = "var a = 5";
-        assert_eq!(Ok(vec![Stmt::VarDecl { name: String::from("a"), value: Expr::Literal { value: token::Literal::Number(5.0) } }]), parse(source));
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::VarDecl { name: String::from("a"), value: Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) } }}}]), parse(source));
     }
 
     #[test]
@@ -866,110 +929,110 @@ mod tests {
     #[test]
     fn while_() {
         let source = "while (a == 2) {print b}";
-        assert_eq!(Ok(vec![Stmt::While {
-            condition: Expr::Binary {
-                left: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::While {
+            condition: Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                 operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
-            },
-            body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] }),
-        }]), parse(source));
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
+            }},
+            body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("b") } }}}]} }),
+        }}]), parse(source));
     }
 
     #[test]
     fn multiple_statements() {
         let source = "print a if (a == 2) {print a} else {print b} var c = 3";
         assert_eq!(Ok(vec![
-            Stmt::Print { expression: Expr::Variable { name: String::from("a") } },
-            Stmt::If {
-                condition: Expr::Binary {
-                    left: Box::new(Expr::Variable { name: String::from("a") }),
+            Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") } } } },
+            Stmt { line: 1, stmt_type: StmtType::If {
+                condition: Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                     operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
-                },
-                then_body: Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("a") } }] }),
-                else_body: Some(Box::new(Stmt::Block { body: vec![Stmt::Print { expression: Expr::Variable { name: String::from("b") } }] })),
-            },
-            Stmt::VarDecl { name: String::from("c"), value: Expr::Literal { value: token::Literal::Number(3.0) } },
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
+                }},
+                then_body: Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") } }}}]} }),
+                else_body: Some(Box::new(Stmt { line: 1, stmt_type: StmtType::Block { body: vec![Stmt { line: 1, stmt_type: StmtType::Print { expression: Expr { line: 1, expr_type: ExprType::Variable { name: String::from("b") } }}}]} })),
+            }},
+            Stmt { line: 1, stmt_type: StmtType::VarDecl { name: String::from("c"), value: Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) } } } },
         ]), parse(source));
     }
 
     #[test]
     fn bidmas() {
         let source = "5*1+2*(3-4/a)";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
-            left: Box::new(Expr::Binary {
-                left: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Binary {
+            left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }}),
                 operator: token::Token { type_: token::TokenType::Star, lexeme: String::from("*"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
-            }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
+            }}),
             operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-            right: Box::new(Expr::Binary {
-                left: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
+            right: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
                 operator: token::Token { type_: token::TokenType::Star, lexeme: String::from("*"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Grouping {
-                    expression: Box::new(Expr::Binary {
-                        left: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Grouping {
+                    expression: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                        left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) }}),
                         operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Binary {
-                            left: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                            left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(4.0) }}),
                             operator: token::Token { type_: token::TokenType::Slash, lexeme: String::from("/"), literal: token::Literal::Null, line: 1 },
-                            right: Box::new(Expr::Variable { name: String::from("a") }),
-                        }),
-                    }),
-                }),
-            }),
-        }}]), parse(source));
+                            right: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
+                    }}),
+                    }}),
+                }}),
+            }}),
+        }}}}]), parse(source));
     }
 
     #[test]
     fn logic() {
         let source = "true and true or false and true or false";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
-            left: Box::new(Expr::Binary {
-                left: Box::new(Expr::Binary {
-                    left: Box::new(Expr::Literal {value: token::Literal::Bool(true) }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Binary {
+            left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Literal {value: token::Literal::Bool(true) }}),
                     operator: token::Token { type_: token::TokenType::And, lexeme: String::from("and"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal {value: token::Literal::Bool(true) }),
-                }),
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal {value: token::Literal::Bool(true) }}),
+                }}),
                 operator: token::Token { type_: token::TokenType::Or, lexeme: String::from("or"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Binary {
-                    left: Box::new(Expr::Literal {value: token::Literal::Bool(false) }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Literal {value: token::Literal::Bool(false) }}),
                     operator: token::Token { type_: token::TokenType::And, lexeme: String::from("and"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal {value: token::Literal::Bool(true) }),
-                }),
-            }),
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal {value: token::Literal::Bool(true) }}),
+                }}),
+            }}),
             operator: token::Token { type_: token::TokenType::Or, lexeme: String::from("or"), literal: token::Literal::Null, line: 1 },
-            right: Box::new(Expr::Literal {value: token::Literal::Bool(false) }),
-        }}]), parse(source));
+            right: Box::new(Expr { line: 1, expr_type: ExprType::Literal {value: token::Literal::Bool(false) }}),
+        }}}}]), parse(source));
     }
 
     #[test]
     fn array() {
         let source = "[[5, a, b], 3+1, \"g\"]";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Array {
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Array {
             elements: vec![
-                Expr::Array {
+                Expr { line: 1, expr_type: ExprType::Array {
                     elements: vec![
-                        Expr::Literal { value: token::Literal::Number(5.0) },
-                        Expr::Variable { name: String::from("a") },
-                        Expr::Variable { name: String::from("b") },
+                        Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }},
+                        Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }},
+                        Expr { line: 1, expr_type: ExprType::Variable { name: String::from("b") }},
                     ]
-                },
-                Expr::Binary {
-                    left: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
+                }},
+                Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) }}),
                     operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
-                },
-                Expr::Literal { value: token::Literal::String_(String::from("g")) },
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
+                }},
+                Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::String_(String::from("g")) }},
             ]
-        }}]), parse(source));
+        }}}}]), parse(source));
     }
     
     #[test]
     fn empty_array() {
         let source = "[]";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Array {elements: vec![] }}]), parse(source));
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Array {elements: vec![] }}}}]), parse(source));
     }
 
     #[test]
@@ -1001,22 +1064,22 @@ mod tests {
     #[test]
     fn element() {
         let source = "a[5]";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Element {
-            array: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Element {
+            array: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
             index: 5,
-        }}]), parse(source));
+        }}}}]), parse(source));
     }
     
     #[test]
     fn element_2d() {
         let source = "a[1][2]";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Element {
-            array: Box::new(Expr::Element {
-                array: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Element {
+            array: Box::new(Expr { line: 1, expr_type: ExprType::Element {
+                array: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
                 index: 1,
-            }),
+            }}),
             index: 2,
-        }}]), parse(source));
+        }}}}]), parse(source));
     }
     
     #[test]
@@ -1032,59 +1095,62 @@ mod tests {
     #[test]
     fn comparison() {
         let source = "1 < 2 == 3 > 4 <= 5 >= 6 != 7";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
-            left: Box::new(Expr::Binary {
-                left: Box::new(Expr::Binary {
-                    left: Box::new(Expr::Literal { value: token::Literal::Number(1.0) }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Binary {
+            left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }}),
                     operator: token::Token { type_: token::TokenType::Less, lexeme: String::from("<"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
-                }),
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
+                }}),
                 operator: token::Token { type_: token::TokenType::EqualEqual, lexeme: String::from("=="), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Binary {
-                    left: Box::new(Expr::Binary {
-                        left: Box::new(Expr::Binary {
-                            left: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                        left: Box::new(Expr { line: 1, expr_type: ExprType::Binary {
+                            left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) }}),
                             operator: token::Token { type_: token::TokenType::Greater, lexeme: String::from(">"), literal: token::Literal::Null, line: 1 },
-                            right: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
-                        }),
+                            right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(4.0) }}),
+                        }}),
                         operator: token::Token { type_: token::TokenType::LessEqual, lexeme: String::from("<="), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
-                    }),
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }}),
+                    }}),
                     operator: token::Token { type_: token::TokenType::GreaterEqual, lexeme: String::from(">="), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal { value: token::Literal::Number(6.0) }),
-                }),
-            }),
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(6.0) }}),
+                }}),
+            }}),
             operator: token::Token { type_: token::TokenType::BangEqual, lexeme: String::from("!="), literal: token::Literal::Null, line: 1 },
-            right: Box::new(Expr::Literal { value: token::Literal::Number(7.0) }),
-        }}]), parse(source));
+            right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(7.0) }}),
+        }}}}]), parse(source));
     }
 
     #[test]
     fn call() {
         let source = "a(1, \"a\")(bc, 2+3)";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Call {
-            callee: Box::new(Expr::Call {
-                callee: Box::new(Expr::Variable { name: String::from("a") }),
-                arguments: vec![Expr::Literal { value: token::Literal::Number(1.0) }, Expr::Literal { value: token::Literal::String_(String::from("a")) }],
-            }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Call {
+            callee: Box::new(Expr { line: 1, expr_type: ExprType::Call {
+                callee: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
+                arguments: vec![
+                    Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(1.0) }},
+                    Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::String_(String::from("a")) }}
+                ],
+            }}),
             arguments: vec![
-                Expr::Variable { name: String::from("bc") },
-                Expr::Binary {
-                    left: Box::new(Expr::Literal { value: token::Literal::Number(2.0) }),
+                Expr { line: 1, expr_type: ExprType::Variable { name: String::from("bc") }},
+                Expr { line: 1, expr_type: ExprType::Binary {
+                    left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(2.0) }}),
                     operator: token::Token { type_: token::TokenType::Plus, lexeme: String::from("+"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Literal { value: token::Literal::Number(3.0) }),
-                }
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(3.0) }}),
+                }}
             ],
-        }}]), parse(source));
+        }}}}]), parse(source));
     }
     
     #[test]
     fn empty_call() {
         let source = "a()";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Call {
-            callee: Box::new(Expr::Variable { name: String::from("a") }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Call {
+            callee: Box::new(Expr { line: 1, expr_type: ExprType::Variable { name: String::from("a") }}),
             arguments: vec![],
-        }}]), parse(source));
+        }}}}]), parse(source));
     }
     
     #[test]
@@ -1098,32 +1164,32 @@ mod tests {
     #[test]
     fn unary() {
         let source = "!!--5";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Unary {
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Unary {
             operator: token::Token { type_: token::TokenType::Bang, lexeme: String::from("!"), literal: token::Literal::Null, line: 1 },
-            right: Box::new(Expr::Unary {
+            right: Box::new(Expr { line: 1, expr_type: ExprType::Unary {
                 operator: token::Token { type_: token::TokenType::Bang, lexeme: String::from("!"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Unary {
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Unary {
                     operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
-                    right: Box::new(Expr::Unary {
+                    right: Box::new(Expr { line: 1, expr_type: ExprType::Unary {
                         operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
-                        right: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
-                    }),
-                }),
-            }),
-        }}]), parse(source));
+                        right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }}),
+                    }}),
+                }}),
+            }}),
+        }}}}]), parse(source));
     }
 
     #[test]
     fn etc() {
         let source = "5--4";
-        assert_eq!(Ok(vec![Stmt::Expression { expression: Expr::Binary {
-            left: Box::new(Expr::Literal { value: token::Literal::Number(5.0) }),
+        assert_eq!(Ok(vec![Stmt { line: 1, stmt_type: StmtType::Expression { expression: Expr { line: 1, expr_type: ExprType::Binary {
+            left: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(5.0) }}),
             operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
-            right: Box::new(Expr::Unary {
+            right: Box::new(Expr { line: 1, expr_type: ExprType::Unary {
                 operator: token::Token { type_: token::TokenType::Minus, lexeme: String::from("-"), literal: token::Literal::Null, line: 1 },
-                right: Box::new(Expr::Literal { value: token::Literal::Number(4.0) }),
-            }),
-        }}]), parse(source));
+                right: Box::new(Expr { line: 1, expr_type: ExprType::Literal { value: token::Literal::Number(4.0) }}),
+            }}),
+        }}}}]), parse(source));
     }
 
     #[test]

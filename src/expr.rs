@@ -1,7 +1,13 @@
 use crate::token;
 
 #[derive(Debug, PartialEq)]
-pub enum Expr {
+pub struct Expr {
+    pub line: usize,
+    pub expr_type: ExprType,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ExprType {
     Array {
         elements: Vec<Expr>,
     },
