@@ -62,7 +62,6 @@ impl Interpreter {
             },
             StmtType::While { condition, body } => {
                 loop {
-                    self.execute(body.as_ref())?;
                     let continue_ = match self.evaluate(condition)? {
                         Value::Bool(condition_bool) => {
                             condition_bool
@@ -72,6 +71,7 @@ impl Interpreter {
                     if !continue_ {
                         break;
                     }
+                    self.execute(body.as_ref())?;
                 }
                 Ok(())
             }
@@ -183,7 +183,8 @@ impl Interpreter {
                     },
                     TokenType::Minus |
                     TokenType::Star |
-                    TokenType::Slash => {
+                    TokenType::Slash |
+                    TokenType::Percent => {
                         match (&left_eval, &right_eval) {
                             (Value::Number(left_num), Value::Number(right_num)) => {
                                 match operator.type_ {
@@ -196,6 +197,7 @@ impl Interpreter {
                                             Ok(Value::Number(left_num / right_num))
                                         }
                                     },
+                                    TokenType::Percent => Ok(Value::Number(left_num % right_num)),
                                     _ => unreachable!(),
                                 }
                             },
@@ -208,7 +210,7 @@ impl Interpreter {
                                 })
                             }
                         }
-                    }
+                    },
                     _ => unreachable!(),
                 }
             },

@@ -84,6 +84,7 @@ pub enum ErrorType {
 }
 
 pub fn report_errors(errors: &[ErrorType]) {
+    println!("An error has occurred. {:?}", errors);
     for error in errors {
         print_report(error);
     }

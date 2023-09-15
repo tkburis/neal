@@ -32,12 +32,11 @@ impl Parser {
                 },
             }
         }
-
-        error::report_errors(&errors[..]);
-
+        
         if errors.is_empty() {
             Ok(statements)
         } else {
+            error::report_errors(&errors[..]);
             Err(errors)
         }
     }
@@ -392,10 +391,10 @@ impl Parser {
 
     // comparison -> addsub ( (">" | "<" | ">=" | "<=") addsub)*
     fn comparison(&mut self) -> Result<Expr, ErrorType> {
-        let mut expr = self.addsub()?;
+        let mut expr = self.add_sub()?;
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Greater, TokenType::Less, TokenType::GreaterEqual, TokenType::LessEqual]) {
-            let right = self.addsub()?;
+            let right = self.add_sub()?;
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
@@ -408,12 +407,12 @@ impl Parser {
         Ok(expr)
     }
 
-    // addsub -> multdiv ( ("+" | "-") multdiv)*
-    fn addsub(&mut self) -> Result<Expr, ErrorType> {
-        let mut expr = self.multdiv()?;
+    // add_sub -> multdiv ( ("+" | "-") multdiv)*
+    fn add_sub(&mut self) -> Result<Expr, ErrorType> {
+        let mut expr = self.mult_div_mod()?;
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Plus, TokenType::Minus]) {
-            let right = self.multdiv()?;
+            let right = self.mult_div_mod()?;
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
@@ -426,11 +425,11 @@ impl Parser {
         Ok(expr)
     }
 
-    // multdiv -> unary ( ("*" | "/") unary)*
-    fn multdiv(&mut self) -> Result<Expr, ErrorType> {
+    // mult_div_mod -> unary ( ("*" | "/") unary)*
+    fn mult_div_mod(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.unary()?;
 
-        while let Some(operator) = self.check_and_consume(&[TokenType::Star, TokenType::Slash]) {
+        while let Some(operator) = self.check_and_consume(&[TokenType::Star, TokenType::Slash, TokenType::Percent]) {
             let right = self.unary()?;
             expr = Expr {
                 line: self.current_line,

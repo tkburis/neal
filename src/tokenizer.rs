@@ -16,6 +16,7 @@ enum State {
     GotSemicolon,
     GotSlash,
     GotStar,
+    GotPercent,
     InComment,
     GotBang,
     GotBangEqual,
@@ -104,6 +105,7 @@ impl<'a> Tokenizer<'a> {
                             ';' => self.current_state = State::GotSemicolon,
                             '/' => self.current_state = State::GotSlash,
                             '*' => self.current_state = State::GotStar,
+                            '%' => self.current_state = State::GotPercent,
     
                             '#' => self.current_state = State::InComment,
     
@@ -154,6 +156,7 @@ impl<'a> Tokenizer<'a> {
                 State::GotSemicolon => return Ok(Some(self.construct_token(TokenType::Semicolon))),
                 State::GotSlash => return Ok(Some(self.construct_token(TokenType::Slash))),
                 State::GotStar => return Ok(Some(self.construct_token(TokenType::Star))),
+                State::GotPercent => return Ok(Some(self.construct_token(TokenType::Percent))),
 
                 State::InComment => {
                     // If we have a new line or we have reached the end of the file, the comment has ended.
