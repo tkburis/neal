@@ -32,9 +32,8 @@ impl Parser {
                 },
             }
         }
-        for error in &errors {
-            error::report(error);
-        }
+
+        error::report_errors(&errors[..]);
 
         if errors.is_empty() {
             Ok(statements)

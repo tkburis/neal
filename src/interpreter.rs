@@ -14,7 +14,8 @@ impl Interpreter {
     pub fn interpret(&mut self, ast: Vec<Stmt>) {
         for stmt in &ast {
             if let Err(e) = self.execute(stmt) {
-                error::report(&e);
+                error::report_errors(&[e]);
+                return;
             }
         }
     }

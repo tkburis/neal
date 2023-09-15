@@ -56,12 +56,12 @@ fn run(source: &str, interpreter: &mut Interpreter) {
         return;
     };
     // println!("TOKENS: {:?}", tokens);
-    println!("TOKENS DONE");
+    // println!("TOKENS DONE");
     let mut parser = Parser::new(tokens);
     let Ok(ast) = parser.parse() else {
         return;
     };
     // println!("AST: {:#?}", ast);
-    println!("AST DONE");
+    // println!("AST DONE");
     interpreter.interpret(ast);
 }

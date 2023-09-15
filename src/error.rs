@@ -83,8 +83,14 @@ pub enum ErrorType {
     },
 }
 
-pub fn report(type_: &ErrorType) {
-    match type_ {
+pub fn report_errors(errors: &[ErrorType]) {
+    for error in errors {
+        print_report(error);
+    }
+}
+
+fn print_report(error: &ErrorType) {
+    match error {
         ErrorType::UnexpectedCharacter { character, line } => {
             println!("Line {0}: unexpected character `{1}`.", line, character);
         },
