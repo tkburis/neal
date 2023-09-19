@@ -9,14 +9,15 @@ enum State {
     GotRightCurly,
     GotLeftSquare,
     GotRightSquare,
+    GotColon,
     GotComma,
     GotDot,
     GotMinus,
+    GotPercent,
     GotPlus,
     GotSemicolon,
     GotSlash,
     GotStar,
-    GotPercent,
     InComment,
     GotBang,
     GotBangEqual,
@@ -98,14 +99,15 @@ impl<'a> Tokenizer<'a> {
                             '}' => self.current_state = State::GotRightCurly,
                             '[' => self.current_state = State::GotLeftSquare,
                             ']' => self.current_state = State::GotRightSquare,
+                            ':' => self.current_state = State::GotColon,
                             ',' => self.current_state = State::GotComma,
                             '.' => self.current_state = State::GotDot,
                             '-' => self.current_state = State::GotMinus,
+                            '%' => self.current_state = State::GotPercent,
                             '+' => self.current_state = State::GotPlus,
                             ';' => self.current_state = State::GotSemicolon,
                             '/' => self.current_state = State::GotSlash,
                             '*' => self.current_state = State::GotStar,
-                            '%' => self.current_state = State::GotPercent,
     
                             '#' => self.current_state = State::InComment,
     
@@ -149,14 +151,15 @@ impl<'a> Tokenizer<'a> {
                 State::GotRightCurly => return Ok(Some(self.construct_token(TokenType::RightCurly))),
                 State::GotLeftSquare => return Ok(Some(self.construct_token(TokenType::LeftSquare))),
                 State::GotRightSquare => return Ok(Some(self.construct_token(TokenType::RightSquare))),
+                State::GotColon => return Ok(Some(self.construct_token(TokenType::Colon))),
                 State::GotComma => return Ok(Some(self.construct_token(TokenType::Comma))),
                 State::GotDot => return Ok(Some(self.construct_token(TokenType::Dot))),
                 State::GotMinus => return Ok(Some(self.construct_token(TokenType::Minus))),
+                State::GotPercent => return Ok(Some(self.construct_token(TokenType::Percent))),
                 State::GotPlus => return Ok(Some(self.construct_token(TokenType::Plus))),
                 State::GotSemicolon => return Ok(Some(self.construct_token(TokenType::Semicolon))),
                 State::GotSlash => return Ok(Some(self.construct_token(TokenType::Slash))),
                 State::GotStar => return Ok(Some(self.construct_token(TokenType::Star))),
-                State::GotPercent => return Ok(Some(self.construct_token(TokenType::Percent))),
 
                 State::InComment => {
                     // If we have a new line or we have reached the end of the file, the comment has ended.
@@ -264,6 +267,7 @@ impl<'a> Tokenizer<'a> {
                         let lexeme = &self.source[self.start..self.current_index];
                         return Ok(Some(match lexeme {
                             "and" => self.construct_token(TokenType::And),
+                            "break" => self.construct_token(TokenType::Break),
                             "class" => self.construct_token(TokenType::Class),
                             "else" => self.construct_token(TokenType::Else),
                             "false" => self.construct_token(TokenType::False),
@@ -319,7 +323,7 @@ mod tests {
 
     #[test]
     fn one_char_tokens() {
-        let source = "( ) { } [ ] , . - + ; / *";
+        let source = "( ) { } [ ] : , . - % + ; / *";
         assert_eq!(Ok(vec![
             Token { type_: TokenType::LeftParen, lexeme: String::from("("), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::RightParen, lexeme: String::from(")"), literal: Literal::Null, line: 1 },
@@ -327,9 +331,11 @@ mod tests {
             Token { type_: TokenType::RightCurly, lexeme: String::from("}"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::LeftSquare, lexeme: String::from("["), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::RightSquare, lexeme: String::from("]"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Colon, lexeme: String::from(":"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Comma, lexeme: String::from(","), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Dot, lexeme: String::from("."), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Minus, lexeme: String::from("-"), literal: Literal::Null, line: 1 },
+            Token { type_: TokenType::Percent, lexeme: String::from("%"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Plus, lexeme: String::from("+"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Semicolon, lexeme: String::from(";"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Slash, lexeme: String::from("/"), literal: Literal::Null, line: 1 },

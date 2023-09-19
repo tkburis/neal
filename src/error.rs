@@ -1,3 +1,5 @@
+use crate::token::Value;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ErrorType {
     // Tokenizing errors.
@@ -34,6 +36,14 @@ pub enum ErrorType {
         line: usize,
     },
     InvalidAssignmentTarget {
+        line: usize,
+    },
+    ExpectedColonAfterKey {
+        line: usize,
+    },
+
+    // Hash table errors.
+    NullAsKey {
         line: usize,
     },
     
@@ -81,10 +91,27 @@ pub enum ErrorType {
     WhileConditionNotBoolean {
         line: usize,
     },
+    CannotCallName {
+        line: usize,
+    },
+    ArgParamNumberMismatch {
+        arg_number: usize,
+        param_number: usize,
+        line: usize,
+    },
+
+    // Misc.
+    ThrownReturn {
+        value: Value,
+        line: usize,
+    },
+    ThrownBreak {
+        line: usize,
+    },
 }
 
 pub fn report_errors(errors: &[ErrorType]) {
-    println!("An error has occurred. {:?}", errors);
+    println!("An error has occurred.");
     for error in errors {
         print_report(error);
     }
@@ -125,6 +152,12 @@ fn print_report(error: &ErrorType) {
         ErrorType::InvalidAssignmentTarget { line } => {
             println!("Line {}: invalid assignment target", line);
         },
+        ErrorType::ExpectedColonAfterKey { line } => {
+            println!("Line {}: expected colon after dictionary key.", line);
+        },
+        ErrorType::NullAsKey { line } => {
+            println!("Line {}: cannot use `Null` as a key.", line);
+        },
         ErrorType::NameError { ref name, line } => {
             println!("Line {0}: `{1}` is not defined.", line, name);
         },
@@ -162,6 +195,19 @@ fn print_report(error: &ErrorType) {
         },
         ErrorType::WhileConditionNotBoolean { line } => {
             println!("Line {}: the condition of the `while` loop does not evaluate to a Boolean value.", line);
+        },
+        ErrorType::CannotCallName { line } => {
+            println!("Line {}: cannot call name as a function.", line);
+        },
+        ErrorType::ArgParamNumberMismatch { arg_number, param_number, line } => {
+            println!("Line {}: attempted to call function with {} arguments, but function accepts {} parameters", line, arg_number, param_number);
+        },
+
+        ErrorType::ThrownReturn { value , line} => {
+            println!("Line {}: `return` has to be used within a function.", line);
+        },
+        ErrorType::ThrownBreak { line } => {
+            println!("Line {}: `break` has to be used within a loop.", line);
         },
     }
 }

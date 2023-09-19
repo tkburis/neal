@@ -1,12 +1,19 @@
 use crate::token;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub line: usize,
     pub expr_type: ExprType,
 }
 
-#[derive(Debug, PartialEq)]
+// TODO: sep file?
+#[derive(Clone, Debug, PartialEq)]
+pub struct KeyValue<T> {
+    pub key: T,
+    pub value: T,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExprType {
     Array {
         elements: Vec<Expr>,
@@ -28,6 +35,9 @@ pub enum ExprType {
     Call {
         callee: Box<Expr>,  // `Expr` so that f()() works
         arguments: Vec<Expr>,
+    },
+    Dictionary {
+        elements: Vec<KeyValue<Expr>>,
     },
     Element {  // ? Maybe this should be combined with `Variable`...
         // ! This should probably NOT be combined with `Variable` because e.g., [1,2,3][0] has to evaluate [1,2,3] first.

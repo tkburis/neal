@@ -5,6 +5,7 @@ use crate::{token::Value, error::ErrorType};
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
 }
+// TODO: BUILTIN FUNCTIONS like append, input (https://users.rust-lang.org/t/how-to-get-user-input/5176/8)
 
 impl Environment {
     pub fn new() -> Self {

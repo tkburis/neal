@@ -1,16 +1,17 @@
 use crate::expr::Expr;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Stmt {
     pub line: usize,
     pub stmt_type: StmtType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum StmtType {
     Block {
         body: Vec<Stmt>,
     },
+    Break,
     Expression {
         expression: Expr,
     },
@@ -26,6 +27,9 @@ pub enum StmtType {
     },
     Print {
         expression: Expr,
+    },
+    Return {
+        expression: Option<Expr>,
     },
     VarDecl {
         name: String,

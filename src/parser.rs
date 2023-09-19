@@ -1,5 +1,5 @@
 use crate::error::{ErrorType, self};
-use crate::expr::{Expr, ExprType};
+use crate::expr::{Expr, ExprType, KeyValue};
 use crate::stmt::{Stmt, StmtType};
 use crate::token::{Token, TokenType, Literal};
 
@@ -58,10 +58,15 @@ impl Parser {
     }
     
     fn statement(&mut self) -> Result<Stmt, ErrorType> {
-        if self.check_and_consume(&[TokenType::For]).is_some() {
+        if self.check_and_consume(&[TokenType::Break]).is_some() {
+            Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::Break
+            })
+        } else if self.check_and_consume(&[TokenType::For]).is_some() {
             self.for_()
         } else if self.check_and_consume(&[TokenType::Func]).is_some() {
-            self.function()
+            self.function()  // TODO: This should be an expression because func declarations evaluate to a function (which assigns to env as a side effect), so can return a function for f()().
         } else if self.check_and_consume(&[TokenType::If]).is_some() {
             self.if_()
         } else if self.check_and_consume(&[TokenType::Print]).is_some() {
@@ -253,10 +258,18 @@ impl Parser {
     }
 
     fn return_(&mut self) -> Result<Stmt, ErrorType> {
-        Ok(Stmt {
-            line: self.current_line,
-            stmt_type: StmtType::Print { expression: self.expression()? }
-        })
+        match self.expression() {
+            Ok(expr) => Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::Return { expression: Some(expr) }
+            }),
+            Err(ErrorType::ExpectedExpression {..}) => Ok(Stmt {
+                line: self.current_line,
+                stmt_type: StmtType::Return { expression: None }
+            }),
+            Err(e) => Err(e),
+        }
+        
     }
 
     fn var(&mut self) -> Result<Stmt, ErrorType> {
@@ -528,6 +541,7 @@ impl Parser {
     // primary -> literals |
     //            "(" expr ")" |
 	//            "[" (expr ("," expr)*)? "]" |
+    //            "{" (expr ":" expr ("," expr ":" expr)*)? "}" |
 	//            identifier
     fn primary(&mut self) -> Result<Expr, ErrorType> {
         if self.check_and_consume(&[TokenType::True]).is_some() {
@@ -566,6 +580,30 @@ impl Parser {
 
             self.expect(TokenType::RightSquare, ']')?;
             Ok(Expr { line: self.current_line, expr_type: ExprType::Array { elements }})
+
+        } else if self.check_and_consume(&[TokenType::LeftCurly]).is_some() {
+            // Dictionary
+            let mut elements: Vec<KeyValue<Expr>> = Vec::new();
+
+            // TODO: infinite loop?
+            if !self.check_next(&[TokenType::RightCurly]) {
+                // If there are elements, i.e. not just {}.
+                loop {
+                    let key = self.expression()?;
+                    if self.check_and_consume(&[TokenType::Colon]).is_none() {
+                        return Err(ErrorType::ExpectedColonAfterKey { line: self.current_line });
+                    }
+                    let value = self.expression()?;
+                    elements.push(KeyValue { key, value });
+
+                    if self.check_and_consume(&[TokenType::Comma]).is_none() {
+                        break;
+                    }
+                }
+            }
+
+            self.expect(TokenType::RightCurly, '}')?;
+            Ok(Expr { line: self.current_line, expr_type: ExprType::Dictionary { elements } })
 
         } else if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
             // Variable.

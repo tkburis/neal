@@ -1,12 +1,17 @@
 use std::fmt;
 
+use crate::stmt::Stmt;
+
+// use crate::hash_table::HashTable;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen, RightParen,
     LeftCurly, RightCurly,
     LeftSquare, RightSquare,
-    Comma, Dot, Minus, Plus, Semicolon, Slash, Star, Percent,
+    Colon, Comma, Dot, Minus, Percent,
+    Plus, Semicolon, Slash, Star,
 
     // One or two character tokens.
     Bang, BangEqual,
@@ -18,8 +23,9 @@ pub enum TokenType {
     Identifier, String_, Number,
 
     // Keywords.
-    And, Class, Else, False, Func, For, If, Null, Or,
-    Print, Return, Self_, True, Var, While,
+    And, Break, Class, Else, False,
+    Func, For, If, Null, Or, Print,
+    Return, Self_, True, Var, While,
 
     Eof,
 }
@@ -33,14 +39,19 @@ pub enum Literal {
     Null,
 }
 
-/// `Value` represents evaluated values within the interpreter.
+/// `Value` represents evaluated/stored values within the interpreter.
 // TODO: Move to separate file
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Number(f64),
+    // Dictionary(HashTable),
     String_(String),
     Bool(bool),
     Array(Vec<Value>),
+    Function {
+        parameters: Vec<String>,
+        body: Stmt,
+    },
     Null,
 }
 
@@ -51,6 +62,7 @@ impl Value {
             Self::String_(..) => String::from("String"),
             Self::Bool(..) => String::from("Boolean"),
             Self::Array(..) => String::from("Array"),
+            Self::Function {..} => String::from("Function"),
             Self::Null => String::from("Null"),
         }
     }
@@ -73,6 +85,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, "]")
             },
+            Self::Function {..} => write!(f, "<function>"),
             Self::Null => write!(f, "Null"),
         }
     }

@@ -1,6 +1,7 @@
 mod environment;
 mod error;
 mod expr;
+mod hash_table;
 mod interpreter;
 mod parser;
 mod stmt;

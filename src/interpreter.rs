@@ -30,13 +30,19 @@ impl Interpreter {
                 self.environment.exit_scope();
                 Ok(())
             },
+            StmtType::Break => {
+                Err(ErrorType::ThrownBreak { line: stmt.line })
+            }
             StmtType::Expression { expression } => {
                 self.evaluate(expression)?;
                 Ok(())
             },
             StmtType::Function { name, parameters, body } => {
-                todo!();
-                // TODO: BUILTIN FUNCTIONS like append
+                self.environment.declare(name.clone(), &Value::Function {
+                    parameters: parameters.clone(),
+                    body: *body.clone(),
+                });
+                Ok(())
             },
             StmtType::If { condition, then_body, else_body } => {
                 match self.evaluate(condition)? {
@@ -55,6 +61,13 @@ impl Interpreter {
                 println!("{}", self.evaluate(expression)?);
                 Ok(())
             },
+            StmtType::Return { expression } => {
+                if let Some(expr) = expression {
+                    Err(ErrorType::ThrownReturn { value: self.evaluate(expr)?, line: stmt.line })
+                } else {
+                    Err(ErrorType::ThrownReturn { value: Value::Null, line: stmt.line })
+                }
+            },
             StmtType::VarDecl { name, value } => {
                 let value_eval = &self.evaluate(value)?;
                 self.environment.declare(name.clone(), value_eval);
@@ -71,10 +84,16 @@ impl Interpreter {
                     if !continue_ {
                         break;
                     }
-                    self.execute(body.as_ref())?;
+
+                    let exec_result = self.execute(body.as_ref());
+                    match exec_result {
+                        Ok(()) => (),
+                        Err(ErrorType::ThrownBreak {..}) => break,
+                        Err(e) => return Err(e),
+                    }
                 }
                 Ok(())
-            }
+            },
         }
     }
 
@@ -215,7 +234,29 @@ impl Interpreter {
                 }
             },
             ExprType::Call { callee, arguments } => {
-                todo!();
+                let function = self.evaluate(callee.as_ref())?;
+                if let Value::Function { parameters, body } = function {
+                    if arguments.len() != parameters.len() {
+                        return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: parameters.len(), line: expr.line })
+                    }
+
+                    self.environment.new_scope();
+                    for i in 0..arguments.len() {
+                        let arg_eval = self.evaluate(&arguments[i])?;
+                        self.environment.declare(parameters[i].clone(), &arg_eval);
+                    }
+
+                    let exec_result = self.execute(&body);
+                    self.environment.exit_scope();
+                    
+                    match exec_result {
+                        Ok(()) => Ok(Value::Null),
+                        Err(ErrorType::ThrownReturn { value, line: _ }) => Ok(value),
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Err(ErrorType::CannotCallName { line: callee.line })
+                }
             },
             ExprType::Element { array, index } => {
                 let index_num = self.index_expr_to_usize(index.as_ref())?;
@@ -273,7 +314,8 @@ impl Interpreter {
             },
             ExprType::Variable { name } => {
                 self.environment.get(name.clone(), None, expr.line)
-            }
+            },
+            _ => todo!(),  // TODO: hash table
         }
     }
 
