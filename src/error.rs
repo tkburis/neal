@@ -1,4 +1,4 @@
-use crate::token::Value;
+use crate::value::Value;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ErrorType {
@@ -69,7 +69,7 @@ pub enum ErrorType {
         line: usize,
     },
     NonNaturalIndexError {
-        got: crate::token::Value,
+        got: Value,
         line: usize,
     },
     NonNumberIndexError {
@@ -203,7 +203,7 @@ fn print_report(error: &ErrorType) {
             println!("Line {}: attempted to call function with {} arguments, but function accepts {} parameters", line, arg_number, param_number);
         },
 
-        ErrorType::ThrownReturn { value , line} => {
+        ErrorType::ThrownReturn { value: _ , line} => {
             println!("Line {}: `return` has to be used within a function.", line);
         },
         ErrorType::ThrownBreak { line } => {

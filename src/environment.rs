@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{token::Value, error::ErrorType};
+use crate::{value::Value, error::ErrorType};
 
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
@@ -94,7 +94,7 @@ impl Environment {
 
 #[cfg(test)]
 mod tests {
-    use crate::{token::Value, error::ErrorType};
+    use crate::{value::Value, error::ErrorType};
 
     use super::Environment;
 

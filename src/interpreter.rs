@@ -1,4 +1,4 @@
-use crate::{environment::Environment, expr::{Expr, ExprType}, token::{Value, TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}};
+use crate::{environment::Environment, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::Value};
 
 pub struct Interpreter {
     environment: Environment,

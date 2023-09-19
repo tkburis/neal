@@ -7,6 +7,7 @@ mod parser;
 mod stmt;
 mod token;
 mod tokenizer;
+mod value;
 
 use std::env;
 use std::io;
@@ -16,7 +17,6 @@ use std::fs;
 
 use parser::Parser;
 use tokenizer::Tokenizer;
-
 use interpreter::Interpreter;
 
 fn main() {

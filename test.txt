@@ -1,16 +1,25 @@
-var count = 0
-var n = 2
-while (count < 1000) {
-    var ok = true
-    for (var i = 2; i * i <= n; i = i + 1) {
-        if (n % i == 0) {
-            ok = false
-            break
-        }
+#var count = 0
+#var n = 2
+#while (count < 1000) {
+#    var ok = true
+#   for (var i = 2; i * i <= n; i = i + 1) {
+#       if (n % i == 0) {
+#           ok = false
+#           break
+#       }
+#   }
+#   if (ok) {
+#       print n
+#       count = count + 1
+#   }
+#   n = n + 1
+#}
+
+func f(x) {
+    func g(x) {
+        return x + x*2
     }
-    if (ok) {
-        print n
-        count = count + 1
-    }
-    n = n + 1
+    return g
 }
+
+print f(5)(6)
