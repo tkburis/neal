@@ -1,16 +1,9 @@
-use crate::token;
+use crate::{token, hash_table::KeyValue};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub line: usize,
     pub expr_type: ExprType,
-}
-
-// TODO: sep file?
-#[derive(Clone, Debug, PartialEq)]
-pub struct KeyValue<T> {
-    pub key: T,
-    pub value: T,
 }
 
 #[derive(Clone, Debug, PartialEq)]

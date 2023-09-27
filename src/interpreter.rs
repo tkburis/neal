@@ -1,4 +1,4 @@
-use crate::{environment::Environment, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::Value};
+use crate::{environment::{Environment, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::Value, hash_table::HashTable};
 
 pub struct Interpreter {
     environment: Environment,
@@ -30,13 +30,16 @@ impl Interpreter {
                 self.environment.exit_scope();
                 Ok(())
             },
+
             StmtType::Break => {
                 Err(ErrorType::ThrownBreak { line: stmt.line })
-            }
+            },
+
             StmtType::Expression { expression } => {
                 self.evaluate(expression)?;
                 Ok(())
             },
+
             StmtType::Function { name, parameters, body } => {
                 self.environment.declare(name.clone(), &Value::Function {
                     parameters: parameters.clone(),
@@ -44,6 +47,7 @@ impl Interpreter {
                 });
                 Ok(())
             },
+
             StmtType::If { condition, then_body, else_body } => {
                 match self.evaluate(condition)? {
                     Value::Bool(condition_bool) => {
@@ -57,10 +61,12 @@ impl Interpreter {
                     _ => Err(ErrorType::IfConditionNotBoolean { line: condition.line })
                 }
             },
+
             StmtType::Print { expression } => {
                 println!("{}", self.evaluate(expression)?);
                 Ok(())
             },
+
             StmtType::Return { expression } => {
                 if let Some(expr) = expression {
                     Err(ErrorType::ThrownReturn { value: self.evaluate(expr)?, line: stmt.line })
@@ -68,11 +74,13 @@ impl Interpreter {
                     Err(ErrorType::ThrownReturn { value: Value::Null, line: stmt.line })
                 }
             },
+
             StmtType::VarDecl { name, value } => {
                 let value_eval = &self.evaluate(value)?;
                 self.environment.declare(name.clone(), value_eval);
                 Ok(())
             },
+            
             StmtType::While { condition, body } => {
                 loop {
                     let continue_ = match self.evaluate(condition)? {
@@ -103,6 +111,7 @@ impl Interpreter {
                 let values: Result<Vec<Value>, _> = elements.iter().map(|x| self.evaluate(x)).collect();
                 Ok(Value::Array(values?))
             },
+
             ExprType::Assignment { target, value } => {
                 let value_eval = self.evaluate(value.as_ref())?;
                 match &target.expr_type {
@@ -110,8 +119,8 @@ impl Interpreter {
                         match &array.expr_type {
                             ExprType::Array {..} => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
                             ExprType::Variable { name } => {
-                                let index_num = self.index_expr_to_usize(index.as_ref())?;
-                                self.environment.assign(name.clone(), Some(index_num), &value_eval, target.line)?;
+                                let index_eval = self.evaluate(index)?;
+                                self.environment.assign(name.clone(), Some(&index_eval), &value_eval, target.line)?;
                             },
                             _ => return Err(ErrorType::NotIndexableError { name: None, line: array.line }),
                         }
@@ -123,6 +132,7 @@ impl Interpreter {
                 }
                 Ok(value_eval)
             },
+
             ExprType::Binary { left, operator, right } => {
                 let left_eval = self.evaluate(left.as_ref())?;
                 let right_eval = self.evaluate(right.as_ref())?;
@@ -233,6 +243,7 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             },
+
             ExprType::Call { callee, arguments } => {
                 let function = self.evaluate(callee.as_ref())?;
                 if let Value::Function { parameters, body } = function {
@@ -258,25 +269,48 @@ impl Interpreter {
                     Err(ErrorType::CannotCallName { line: callee.line })
                 }
             },
+
+            ExprType::Dictionary { elements } => {
+                let mut hash_table = HashTable::new();
+                for key_value in elements.iter() {
+                    let key_eval = self.evaluate(&key_value.key)?;
+                    let value_eval = self.evaluate(&key_value.value)?;
+                    hash_table.insert(&key_eval, &value_eval, expr.line)?;
+                }
+                Ok(Value::Dictionary(hash_table))
+            },
+
             ExprType::Element { array, index } => {
-                let index_num = self.index_expr_to_usize(index.as_ref())?;
+                let index_eval = self.evaluate(index.as_ref())?;
                 match &array.expr_type {
                     ExprType::Array { elements } => {
+                        let index_num = environment::index_value_to_usize(&index_eval, expr.line)?;
                         if let Some(element_expr) = elements.get(index_num) {
                             self.evaluate(element_expr)
                         } else {
                             Err(ErrorType::OutOfBoundsIndexError { name: None, index: index_num, line: expr.line })
                         }
                     },
+                    ExprType::Dictionary { elements } => {
+                        for key_value_expr in elements.iter().rev() {  // Go in reverse to emulate normal `replacing` behaviour.
+                            let key_eval = self.evaluate(&key_value_expr.key)?;
+                            if index_eval == key_eval {
+                                return Ok(self.evaluate(&key_value_expr.value)?);
+                            }
+                        }
+                        Err(ErrorType::KeyError { key: index_eval, line: expr.line })
+                    },
                     ExprType::Variable { name } => {
-                        self.environment.get(name.clone(), Some(index_num), expr.line)
+                        self.environment.get(name.clone(), Some(index_eval), expr.line)
                     },
                     _ => Err(ErrorType::NotIndexableError { name: None, line: array.line }),
                 }
             },
+
             ExprType::Grouping { expression } => {
                 self.evaluate(expression.as_ref())
             },
+
             ExprType::Literal { value } => {
                 match value {
                     Literal::Number(x) => Ok(Value::Number(*x)),
@@ -285,6 +319,7 @@ impl Interpreter {
                     Literal::Null => Ok(Value::Null),
                 }
             },
+
             ExprType::Unary { operator, right } => {
                 let right_eval = self.evaluate(right.as_ref())?;
 
@@ -312,24 +347,10 @@ impl Interpreter {
                     _ => unreachable!(),
                 }
             },
+
             ExprType::Variable { name } => {
                 self.environment.get(name.clone(), None, expr.line)
             },
-            _ => todo!(),  // TODO: hash table
-        }
-    }
-
-    fn index_expr_to_usize(&mut self, index_expr: &Expr) -> Result<usize, ErrorType> {
-        let index_eval = self.evaluate(index_expr)?;
-        match index_eval {
-            Value::Number(index_num) => {
-                if index_num >= 0.0 && index_num.fract() == 0.0 {
-                    Ok(index_num as usize)
-                } else {
-                    Err(ErrorType::NonNaturalIndexError { got: index_eval, line: index_expr.line })
-                }
-            },
-            _ => Err(ErrorType::NonNumberIndexError { got: index_eval.type_to_string(), line: index_expr.line })
         }
     }
 }

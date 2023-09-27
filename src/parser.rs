@@ -1,5 +1,6 @@
 use crate::error::{ErrorType, self};
-use crate::expr::{Expr, ExprType, KeyValue};
+use crate::expr::{Expr, ExprType};
+use crate::hash_table::KeyValue;
 use crate::stmt::{Stmt, StmtType};
 use crate::token::{Token, TokenType, Literal};
 
@@ -66,7 +67,7 @@ impl Parser {
         } else if self.check_and_consume(&[TokenType::For]).is_some() {
             self.for_()
         } else if self.check_and_consume(&[TokenType::Func]).is_some() {
-            self.function()  // TODO: This should be an expression because func declarations evaluate to a function (which assigns to env as a side effect), so can return a function for f()().
+            self.function()
         } else if self.check_and_consume(&[TokenType::If]).is_some() {
             self.if_()
         } else if self.check_and_consume(&[TokenType::Print]).is_some() {

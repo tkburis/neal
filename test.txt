@@ -16,8 +16,8 @@
 #}
 
 func f(x) {
-    func g(x) {
-        return x + x*2
+    func g(y) {
+        return x + y*2
     }
     return g
 }

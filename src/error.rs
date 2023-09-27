@@ -41,11 +41,6 @@ pub enum ErrorType {
     ExpectedColonAfterKey {
         line: usize,
     },
-
-    // Hash table errors.
-    NullAsKey {
-        line: usize,
-    },
     
     // Environment errors.
     NameError {
@@ -97,6 +92,15 @@ pub enum ErrorType {
     ArgParamNumberMismatch {
         arg_number: usize,
         param_number: usize,
+        line: usize,
+    },
+
+    // Hash table
+    CannotHashFunction {
+        line: usize,
+    },
+    KeyError {
+        key: Value,
         line: usize,
     },
 
@@ -155,9 +159,6 @@ fn print_report(error: &ErrorType) {
         ErrorType::ExpectedColonAfterKey { line } => {
             println!("Line {}: expected colon after dictionary key.", line);
         },
-        ErrorType::NullAsKey { line } => {
-            println!("Line {}: cannot use `Null` as a key.", line);
-        },
         ErrorType::NameError { ref name, line } => {
             println!("Line {0}: `{1}` is not defined.", line, name);
         },
@@ -201,6 +202,12 @@ fn print_report(error: &ErrorType) {
         },
         ErrorType::ArgParamNumberMismatch { arg_number, param_number, line } => {
             println!("Line {}: attempted to call function with {} arguments, but function accepts {} parameters", line, arg_number, param_number);
+        },
+        ErrorType::CannotHashFunction { line } => {
+            println!("Line {}: cannot hash `Function` type.", line);
+        },
+        ErrorType::KeyError { key, line } => {
+            println!("Line {}: key `{}` does not exist in the dictionary.", line, key);
         },
 
         ErrorType::ThrownReturn { value: _ , line} => {
