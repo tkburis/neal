@@ -31,10 +31,19 @@ impl HashTable {
         }
     }
 
-    pub fn get(&self, key: &Value, line: usize) -> Result<Value, ErrorType> {
-        let bucket_number = self.get_bucket_number(&key, line)?;
+    pub fn get(&self, key: &Value, line: usize) -> Result<&Value, ErrorType> {
+        let bucket_number = self.get_bucket_number(key, line)?;
         if let Some(key_value) = self.array[bucket_number].iter().find(|key_value| key_value.key == key.clone()) {
-            Ok(key_value.value.clone())
+            Ok(&key_value.value)
+        } else {
+            Err(ErrorType::KeyError { key: key.clone(), line })
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &Value, line: usize) -> Result<&mut Value, ErrorType> {
+        let bucket_number = self.get_bucket_number(key, line)?;
+        if let Some(key_value) = self.array[bucket_number].iter_mut().find(|key_value| key_value.key == key.clone()) {
+            Ok(&mut key_value.value)
         } else {
             Err(ErrorType::KeyError { key: key.clone(), line })
         }
@@ -42,7 +51,7 @@ impl HashTable {
 
     /// Inserts a key-value pair to the table if the key does not already exist; otherwise, update the existing pair with the new value.
     pub fn insert(&mut self, key: &Value, value: &Value, line: usize) -> Result<(), ErrorType> {
-        let bucket_number = self.get_bucket_number(&key, line)?;
+        let bucket_number = self.get_bucket_number(key, line)?;
         println!("ASSIGNED: {}", bucket_number);
         if let Some(key_value) = self.array[bucket_number].iter_mut().find(|key_value| key_value.key == key.clone()) {
             key_value.value = value.clone();
@@ -56,7 +65,7 @@ impl HashTable {
     }
 
     pub fn remove(&mut self, key: &Value, line: usize) -> Result<(), ErrorType> {
-        let bucket_number = self.get_bucket_number(&key, line)?;
+        let bucket_number = self.get_bucket_number(key, line)?;
         if let Some(index) = self.array[bucket_number].iter().position(|key_value| key_value.key == key.clone()) {
             self.array[bucket_number].remove(index);
             self.entries -= 1;
@@ -67,11 +76,9 @@ impl HashTable {
     }
 
     fn check_load(&mut self) {
-        if self.current_capacity < MAX_CAPACITY {
-            if self.entries * LOAD_FACTOR_DENOMINATOR > self.current_capacity * LOAD_FACTOR_NUMERATOR {
-                self.array.append(&mut vec![Vec::new(); self.current_capacity]);
-                self.current_capacity <<= 1;
-            }
+        if self.current_capacity < MAX_CAPACITY && self.entries * LOAD_FACTOR_DENOMINATOR > self.current_capacity * LOAD_FACTOR_NUMERATOR {
+            self.array.append(&mut vec![Vec::new(); self.current_capacity]);
+            self.current_capacity <<= 1;
         }
     }
 
@@ -139,7 +146,7 @@ fn hash(key: &Value, line: usize) -> Result<usize, ErrorType> {
         Value::Dictionary(x) => {
             x.hash_self(line)
         },
-        Value::Function { parameters: _, body: _ } => {
+        Value::Function {..} | Value::BuiltinFunction(..) => {
             Err(ErrorType::CannotHashFunction { line })
         },
         Value::Null => Ok(3),

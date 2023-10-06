@@ -1,4 +1,4 @@
-use crate::{environment::{Environment, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::Value, hash_table::HashTable};
+use crate::{environment::{Environment, AssignmentPointer, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::{Value, BuiltinFunction}, hash_table::HashTable};
 
 pub struct Interpreter {
     environment: Environment,
@@ -114,22 +114,28 @@ impl Interpreter {
 
             ExprType::Assignment { target, value } => {
                 let value_eval = self.evaluate(value.as_ref())?;
-                match &target.expr_type {
-                    ExprType::Element { array, index } => {
-                        match &array.expr_type {
-                            ExprType::Array {..} => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
-                            ExprType::Variable { name } => {
-                                let index_eval = self.evaluate(index)?;
-                                self.environment.assign(name.clone(), Some(&index_eval), &value_eval, target.line)?;
-                            },
-                            _ => return Err(ErrorType::NotIndexableError { name: None, line: array.line }),
-                        }
-                    },
-                    ExprType::Variable { name } => {
-                        self.environment.assign(name.clone(), None, &value_eval, target.line)?;
-                    },
-                    _ => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
-                }
+                // println!("{:?}", self.to_pointer(target));
+                // match &target.expr_type {  // ! BROKEN RN
+                //     ExprType::Element { array, index } => {
+                //         match &array.expr_type {
+                //             ExprType::Array {..} | ExprType::Dictionary {..} => (),  // if target is literal array/dict, don't do anything
+                //             ExprType::Variable { name } => {
+                //                 let index_eval = self.evaluate(index)?;
+                //                 self.environment.update(name.clone(), Some(&index_eval), &value_eval, target.line)?;
+                //             },
+                //             _ => return Err(ErrorType::NotIndexableError { name: None, line: array.line }),
+                //         }
+                //     },
+                //     ExprType::Variable { name } => {
+                //         self.environment.update(name.clone(), None, &value_eval, target.line)?;
+                //     },
+                //     _ => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
+                // }
+                match self.to_assignment_pointer(&target, expr.line) {
+                    Ok(pointer) => self.environment.update(&pointer, &value_eval, expr.line)?,
+                    Err(ErrorType::ThrownLiteralAssignment { .. }) => (),  // If assign to literal, e.g. [1,2][0] = 5, do nothing
+                    Err(e) => return Err(e),
+                };
                 Ok(value_eval)
             },
 
@@ -246,27 +252,84 @@ impl Interpreter {
 
             ExprType::Call { callee, arguments } => {
                 let function = self.evaluate(callee.as_ref())?;
-                if let Value::Function { parameters, body } = function {
-                    if arguments.len() != parameters.len() {
-                        return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: parameters.len(), line: expr.line })
-                    }
+                match function {
+                    Value::Function { parameters, body } => {
+                        if arguments.len() != parameters.len() {
+                            return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: parameters.len(), line: expr.line })
+                        }
+        
+                        self.environment.new_scope();
+                        for i in 0..arguments.len() {  // attach arguments to scope
+                            let arg_eval = self.evaluate(&arguments[i])?;
+                            self.environment.declare(parameters[i].clone(), &arg_eval);
+                        }
+        
+                        let exec_result = self.execute(&body);
+                        self.environment.exit_scope();
+                        
+                        match exec_result {
+                            Ok(()) => Ok(Value::Null),
+                            Err(ErrorType::ThrownReturn { value, line: _ }) => Ok(value),
+                            Err(e) => Err(e),
+                        }
+                    },
+                    Value::BuiltinFunction(function) => {
+                        match function {
+                            BuiltinFunction::Append => {
+                                if arguments.len() != 2 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line })
+                                }
 
-                    self.environment.new_scope();
-                    for i in 0..arguments.len() {
-                        let arg_eval = self.evaluate(&arguments[i])?;
-                        self.environment.declare(parameters[i].clone(), &arg_eval);
-                    }
+                                let target = &arguments[0];
+                                let value_eval = self.evaluate(&arguments[1])?;
 
-                    let exec_result = self.execute(&body);
-                    self.environment.exit_scope();
-                    
-                    match exec_result {
-                        Ok(()) => Ok(Value::Null),
-                        Err(ErrorType::ThrownReturn { value, line: _ }) => Ok(value),
-                        Err(e) => Err(e),
-                    }
-                } else {
-                    Err(ErrorType::CannotCallName { line: callee.line })
+                                let target_eval = self.evaluate(&target)?;
+                                let pointer = self.to_assignment_pointer(&target, target.line)?;
+                                if let Value::Array(mut array) = target_eval {
+                                    array.push(value_eval);
+                                    self.environment.update(&pointer, &Value::Array(array.clone()), expr.line)?;
+                                    Ok(Value::Array(array))
+                                } else {
+                                    Err(ErrorType::ExpectedTypeError { expected: String::from("Array"), got: target_eval.type_to_string(), line: target.line })
+                                }
+                            },
+                            BuiltinFunction::Input => {todo!()},
+                            BuiltinFunction::Remove => {
+                                if arguments.len() != 2 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line })
+                                }
+
+                                let target = &arguments[0];
+                                let key_eval = self.evaluate(&arguments[1])?;
+
+                                let target_eval = self.evaluate(&target)?;
+                                let pointer = self.to_assignment_pointer(&target, target.line)?;
+                                match target_eval {
+                                    Value::Array(mut array) => {
+                                        let index = environment::index_value_to_usize(&key_eval, arguments[1].line)?;
+
+                                        if index < array.len() {
+                                            array.remove(index);
+                                        } else {
+                                            return Err(ErrorType::OutOfBoundsIndexError { name: None, index, line: arguments[1].line });
+                                        }
+                                        
+                                        self.environment.update(&pointer, &Value::Array(array.clone()), expr.line)?;
+
+                                        Ok(Value::Array(array))
+                                    },
+                                    Value::Dictionary(mut dict) => {
+                                        dict.remove(&key_eval, expr.line)?;
+                                        self.environment.update(&pointer, &Value::Dictionary(dict.clone()), expr.line)?;
+                                        
+                                        Ok(Value::Dictionary(dict))
+                                    },
+                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array or Dictionary"), got: target_eval.type_to_string(), line: target.line }),
+                                }
+                            },
+                        }
+                    },
+                    _ => Err(ErrorType::CannotCallName { line: callee.line })
                 }
             },
 
@@ -295,7 +358,7 @@ impl Interpreter {
                         for key_value_expr in elements.iter().rev() {  // Go in reverse to emulate normal `replacing` behaviour.
                             let key_eval = self.evaluate(&key_value_expr.key)?;
                             if index_eval == key_eval {
-                                return Ok(self.evaluate(&key_value_expr.value)?);
+                                return self.evaluate(&key_value_expr.value);
                             }
                         }
                         Err(ErrorType::KeyError { key: index_eval, line: expr.line })
@@ -351,6 +414,22 @@ impl Interpreter {
             ExprType::Variable { name } => {
                 self.environment.get(name.clone(), None, expr.line)
             },
+        }
+    }
+
+    fn to_assignment_pointer(&mut self, element: &Expr, line: usize) -> Result<AssignmentPointer, ErrorType> {
+        match &element.expr_type {
+            ExprType::Element { array, index } => {
+                let AssignmentPointer {name, indeces} = self.to_assignment_pointer(array.as_ref(), line)?;
+                let mut indeces_copy = indeces;
+                indeces_copy.push(self.evaluate(index.as_ref())?);
+                Ok(AssignmentPointer {name, indeces: indeces_copy})
+            },
+            ExprType::Variable { name } => {
+                Ok(AssignmentPointer {name: name.clone(), indeces: Vec::new()})
+            },
+            ExprType::Array {..} | ExprType::Dictionary {..} => Err(ErrorType::ThrownLiteralAssignment { line }),
+            _ => Err(ErrorType::InvalidAssignmentTarget { line }),
         }
     }
 }

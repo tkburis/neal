@@ -1,25 +1,7 @@
-#var count = 0
-#var n = 2
-#while (count < 1000) {
-#    var ok = true
-#   for (var i = 2; i * i <= n; i = i + 1) {
-#       if (n % i == 0) {
-#           ok = false
-#           break
-#       }
-#   }
-#   if (ok) {
-#       print n
-#       count = count + 1
-#   }
-#   n = n + 1
-#}
-
-func f(x) {
-    func g(y) {
-        return x + y*2
-    }
-    return g
+func add(a, b) {
+    return a+b
 }
-
-print f(5)(6)
+var ages = {"bob": "5"}
+print "bob is" + ages["bob"]
+var a = 5
+a(5)

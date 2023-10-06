@@ -47,11 +47,11 @@ pub enum ErrorType {
         name: String,
         line: usize,
     },
-    NotIndexableError {
+    NotIndexableError {  // TODO: Maybe no need for `name`.
         name: Option<String>,
         line: usize,
     },
-    OutOfBoundsIndexError {
+    OutOfBoundsIndexError {  // TODO: Maybe no need for name.
         name: Option<String>,
         index: usize,
         line: usize,
@@ -112,6 +112,9 @@ pub enum ErrorType {
     ThrownBreak {
         line: usize,
     },
+    ThrownLiteralAssignment {
+        line: usize,
+    },
 }
 
 pub fn report_errors(errors: &[ErrorType]) {
@@ -166,7 +169,7 @@ fn print_report(error: &ErrorType) {
             if let Some(n) = name {
                 println!("Line {0}: `{1}` is not indexable.", line, n);
             } else {
-                println!("Line {}: the expression is not indexable.", line);
+                println!("Line {}: the value is not indexable.", line);
             }
         },
         ErrorType::OutOfBoundsIndexError { name, index, line } => {
@@ -215,6 +218,9 @@ fn print_report(error: &ErrorType) {
         },
         ErrorType::ThrownBreak { line } => {
             println!("Line {}: `break` has to be used within a loop.", line);
+        },
+        ErrorType::ThrownLiteralAssignment { line } => {
+            println!("Line {}: attempt to assign to a literal.", line);
         },
     }
 }

@@ -1,6 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{value::Value, error::ErrorType};
+use crate::{value::{Value, BuiltinFunction}, error::ErrorType};
+
+#[derive(Debug)]
+pub struct AssignmentPointer {
+    pub name: String,
+    pub indeces: Vec<Value>,
+}
 
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
@@ -10,7 +16,11 @@ pub struct Environment {
 impl Environment {
     pub fn new() -> Self {
         Self {
-            scopes: vec![HashMap::new()],
+            scopes: vec![HashMap::from([
+                (String::from("append"), Value::BuiltinFunction(BuiltinFunction::Append)),
+                (String::from("input"), Value::BuiltinFunction(BuiltinFunction::Input)),
+                (String::from("remove"), Value::BuiltinFunction(BuiltinFunction::Remove)),
+            ])],
         }
     }
 
@@ -50,7 +60,7 @@ impl Environment {
                             }
                         },
                         Value::Dictionary(dict) => {
-                            dict.get(&key, line)
+                            dict.get(&key, line).cloned()
                         },
                         // If an index is provided but the value is not an array...
                         _ => Err(ErrorType::NotIndexableError { name: Some(name), line }),
@@ -64,37 +74,43 @@ impl Environment {
         Err(ErrorType::NameError { name, line })
     }
 
-    pub fn assign(&mut self, name: String, index: Option<&Value>, value: &Value, line: usize) -> Result<(), ErrorType> {
+    pub fn update(&mut self, pointer: &AssignmentPointer, value: &Value, line: usize) -> Result<(), ErrorType> {
+        println!("{:?}", pointer);
         for scope in self.scopes.iter_mut().rev() {
-            if let Some(object) = scope.get_mut(&name) {
+            if let Some(object) = scope.get_mut(&pointer.name) {
                 // If there is a value associated with `name`...
-                if let Some(key) = index {
-                    // If an index is provided...
-                    return match object {
-                        Value::Array(array) => {
-                            let idx = index_value_to_usize(&key, line)?;
-                            if idx < array.len() {
-                                array[idx] = value.clone();
-                                Ok(())
-                            } else {
-                                // If the index provided is out-of-bounds or similar...
-                                Err(ErrorType::OutOfBoundsIndexError { name: Some(name), index: idx, line })
-                            }
-                        },
-                        Value::Dictionary(dict) => {
-                            dict.insert(&key, value, line)
+                if pointer.indeces.len() > 0 {
+                    // If indeces were provided...
+                    let mut current_element = object;
+                    for i in pointer.indeces.iter() {
+                        match current_element {
+                            Value::Array(array) => {
+                                let idx = index_value_to_usize(i, line)?;
+                                if let Some(el) = array.get_mut(idx) {
+                                    current_element = el;
+                                } else {
+                                    // If the index provided is out-of-bounds or similar...
+                                    return Err(ErrorType::OutOfBoundsIndexError { name: None, index: idx, line })
+                                }
+                            },
+                            Value::Dictionary(dict) => {
+                                current_element = dict.get_mut(i, line)?;
+                            },
+                            _ => return Err(ErrorType::NotIndexableError { name: None, line }),
                         }
-                        // If an index is provided but the value is not an array...
-                        _ => Err(ErrorType::NotIndexableError { name: Some(name), line }),
                     }
+
+                    *current_element = value.clone();
+
+                    return Ok(());
                 } else {
-                    // No index was provided.
-                    scope.insert(name, value.clone());
+                    // If no indeces were provided...
+                    scope.insert(pointer.name.clone(), value.clone());
+                    return Ok(());
                 }
-                return Ok(());
             }
         }
-        Err(ErrorType::NameError { name, line })
+        Err(ErrorType::NameError { name: pointer.name.clone(), line })
     }
 
 }
@@ -114,7 +130,7 @@ pub fn index_value_to_usize(index: &Value, line: usize) -> Result<usize, ErrorTy
 
 #[cfg(test)]
 mod tests {
-    use crate::{value::Value, error::ErrorType};
+    use crate::{value::Value, error::ErrorType, environment::AssignmentPointer};
 
     use super::Environment;
 
@@ -129,7 +145,7 @@ mod tests {
         assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(5.0)));
         assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))])));
 
-        let _ = env.assign(String::from("b"), None, &Value::String_(String::from("abc")), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::String_(String::from("abc")), 1);
         assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(5.0)));
         assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::String_(String::from("abc"))));
     }
@@ -145,7 +161,7 @@ mod tests {
         env.declare(String::from("a"), &Value::Array(vec![Value::Number(1.0), Value::Bool(true), Value::String_(String::from("abc"))]));
         assert_eq!(env.get(String::from("a"), Some(Value::Number(1.0)), 1), Ok(Value::Bool(true)));
 
-        let _ = env.assign(String::from("a"), Some(&Value::Number(0.0)), &Value::Number(5.0), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("a"), indeces: vec![Value::Number(0.0)] }, &Value::Number(5.0), 1);
         assert_eq!(env.get(String::from("a"), Some(Value::Number(0.0)), 1), Ok(Value::Number(5.0)));
         assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Array(vec![Value::Number(5.0), Value::Bool(true), Value::String_(String::from("abc"))])));
     }
@@ -172,13 +188,13 @@ mod tests {
         env.declare(String::from("b"), &Value::Number(2.0));
 
         env.new_scope();
-        let _ = env.assign(String::from("a"), None, &Value::Number(10.0), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("a"), indeces: vec![] }, &Value::Number(10.0), 1);
         env.declare(String::from("b"), &Value::Number(20.0));
         assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(10.0)));
         assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(20.0)));
 
         env.new_scope();
-        let _ = env.assign(String::from("b"), None, &Value::Number(30.0), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::Number(30.0), 1);
         assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(30.0)));
 
         env.exit_scope();
@@ -198,7 +214,7 @@ mod tests {
     #[test]
     fn name_error_assign() {
         let mut env = Environment::new();
-        assert_eq!(env.assign(String::from("b"), None, &Value::Null, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
+        assert_eq!(env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::Null, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
     }
 
     #[test]

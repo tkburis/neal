@@ -14,6 +14,7 @@ pub enum Value {
         parameters: Vec<String>,
         body: Stmt,
     },
+    BuiltinFunction(BuiltinFunction),
     Null,
 }
 
@@ -25,7 +26,7 @@ impl Value {
             Self::Bool(..) => String::from("Boolean"),
             Self::Array(..) => String::from("Array"),
             Self::Dictionary(..) => String::from("Dictionary"),
-            Self::Function {..} => String::from("Function"),
+            Self::Function {..} | Self::BuiltinFunction(..) => String::from("Function"),
             Self::Null => String::from("Null"),
         }
     }
@@ -62,8 +63,15 @@ impl fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
-            Self::Function {..} => write!(f, "<function>"),
+            Self::Function {..} | Self::BuiltinFunction(..) => write!(f, "<function>"),
             Self::Null => write!(f, "Null"),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BuiltinFunction {
+    Append,
+    Input,
+    Remove,
 }
