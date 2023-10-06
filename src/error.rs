@@ -104,6 +104,11 @@ pub enum ErrorType {
         line: usize,
     },
 
+    // Conversion
+    ConvertToNumberError {
+        line: usize,
+    },
+
     // Misc.
     ThrownReturn {
         value: Value,
@@ -204,13 +209,16 @@ fn print_report(error: &ErrorType) {
             println!("Line {}: cannot call name as a function.", line);
         },
         ErrorType::ArgParamNumberMismatch { arg_number, param_number, line } => {
-            println!("Line {}: attempted to call function with {} arguments, but function accepts {} parameters", line, arg_number, param_number);
+            println!("Line {}: attempted to call function with {} argument(s), but function accepts {}", line, arg_number, param_number);
         },
         ErrorType::CannotHashFunction { line } => {
             println!("Line {}: cannot hash `Function` type.", line);
         },
         ErrorType::KeyError { key, line } => {
             println!("Line {}: key `{}` does not exist in the dictionary.", line, key);
+        },
+        ErrorType::ConvertToNumberError { line } => {
+            println!("Line {}: could not convert to Number.", line);
         },
 
         ErrorType::ThrownReturn { value: _ , line} => {

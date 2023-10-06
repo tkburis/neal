@@ -9,7 +9,7 @@ const MAX_CALC: usize = 65381;  // prime, so numbers do not divide evenly. preve
 const LOAD_FACTOR_NUMERATOR: usize = 3;
 const LOAD_FACTOR_DENOMINATOR: usize = 4;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyValue<T> {
     pub key: T,
     pub value: T,

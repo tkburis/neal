@@ -1,3 +1,5 @@
+use std::io::{Write, self};
+
 use crate::{environment::{Environment, AssignmentPointer, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::{Value, BuiltinFunction}, hash_table::HashTable};
 
 pub struct Interpreter {
@@ -131,7 +133,7 @@ impl Interpreter {
                 //     },
                 //     _ => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
                 // }
-                match self.to_assignment_pointer(&target, expr.line) {
+                match self.construct_assignment_pointer(target, expr.line) {
                     Ok(pointer) => self.environment.update(&pointer, &value_eval, expr.line)?,
                     Err(ErrorType::ThrownLiteralAssignment { .. }) => (),  // If assign to literal, e.g. [1,2][0] = 5, do nothing
                     Err(e) => return Err(e),
@@ -283,17 +285,32 @@ impl Interpreter {
                                 let target = &arguments[0];
                                 let value_eval = self.evaluate(&arguments[1])?;
 
-                                let target_eval = self.evaluate(&target)?;
-                                let pointer = self.to_assignment_pointer(&target, target.line)?;
+                                let target_eval = self.evaluate(target)?;
+                                let pointer = self.construct_assignment_pointer(target, target.line)?;
                                 if let Value::Array(mut array) = target_eval {
                                     array.push(value_eval);
                                     self.environment.update(&pointer, &Value::Array(array.clone()), expr.line)?;
+
                                     Ok(Value::Array(array))
                                 } else {
                                     Err(ErrorType::ExpectedTypeError { expected: String::from("Array"), got: target_eval.type_to_string(), line: target.line })
                                 }
                             },
-                            BuiltinFunction::Input => {todo!()},
+                            BuiltinFunction::Input => {
+                                if arguments.len() != 1 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                }
+
+                                let prompt = self.evaluate(&arguments[0])?;
+                                print!("{}", prompt);
+                                io::stdout().flush().expect("Error: flush failed");
+
+                                let mut input = String::new();
+                                io::stdin().read_line(&mut input).expect("Error: something went wrong while reading input");
+                                input = input.trim().to_string();
+
+                                Ok(Value::String_(input))
+                            },
                             BuiltinFunction::Remove => {
                                 if arguments.len() != 2 {
                                     return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line })
@@ -302,8 +319,8 @@ impl Interpreter {
                                 let target = &arguments[0];
                                 let key_eval = self.evaluate(&arguments[1])?;
 
-                                let target_eval = self.evaluate(&target)?;
-                                let pointer = self.to_assignment_pointer(&target, target.line)?;
+                                let target_eval = self.evaluate(target)?;
+                                let pointer = self.construct_assignment_pointer(target, target.line)?;
                                 match target_eval {
                                     Value::Array(mut array) => {
                                         let index = environment::index_value_to_usize(&key_eval, arguments[1].line)?;
@@ -325,6 +342,47 @@ impl Interpreter {
                                         Ok(Value::Dictionary(dict))
                                     },
                                     _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array or Dictionary"), got: target_eval.type_to_string(), line: target.line }),
+                                }
+                            },
+                            BuiltinFunction::ToNumber => {
+                                if arguments.len() != 1 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                }
+
+                                let value = self.evaluate(&arguments[0])?;
+                                match value {
+                                    Value::Bool(b) => {
+                                        match b {
+                                            true => Ok(Value::Number(1.0)),
+                                            false => Ok(Value::Number(0.0)),
+                                        }
+                                    },
+                                    Value::Number(..) => Ok(value),
+                                    Value::String_(s) => {
+                                        match s.parse::<f64>() {
+                                            Ok(x) => Ok(Value::Number(x)),
+                                            Err(..) => Err(ErrorType::ConvertToNumberError { line: expr.line }),
+                                        }
+                                    },
+                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
+                                }
+                            },
+                            BuiltinFunction::ToString => {
+                                if arguments.len() != 1 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                }
+
+                                let value = self.evaluate(&arguments[0])?;
+                                match value {
+                                    Value::Bool(b) => {
+                                        match b {
+                                            true => Ok(Value::String_(String::from("true"))),
+                                            false => Ok(Value::String_(String::from("false"))),
+                                        }
+                                    },
+                                    Value::Number(x) => Ok(Value::String_(x.to_string())),
+                                    Value::String_(..) => Ok(value),
+                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                         }
@@ -417,10 +475,10 @@ impl Interpreter {
         }
     }
 
-    fn to_assignment_pointer(&mut self, element: &Expr, line: usize) -> Result<AssignmentPointer, ErrorType> {
+    fn construct_assignment_pointer(&mut self, element: &Expr, line: usize) -> Result<AssignmentPointer, ErrorType> {
         match &element.expr_type {
             ExprType::Element { array, index } => {
-                let AssignmentPointer {name, indeces} = self.to_assignment_pointer(array.as_ref(), line)?;
+                let AssignmentPointer {name, indeces} = self.construct_assignment_pointer(array.as_ref(), line)?;
                 let mut indeces_copy = indeces;
                 indeces_copy.push(self.evaluate(index.as_ref())?);
                 Ok(AssignmentPointer {name, indeces: indeces_copy})

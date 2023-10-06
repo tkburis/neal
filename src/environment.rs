@@ -11,7 +11,6 @@ pub struct AssignmentPointer {
 pub struct Environment {
     scopes: Vec<HashMap<String, Value>>,
 }
-// TODO: BUILTIN FUNCTIONS like append, input (https://users.rust-lang.org/t/how-to-get-user-input/5176/8)
 
 impl Environment {
     pub fn new() -> Self {
@@ -20,6 +19,8 @@ impl Environment {
                 (String::from("append"), Value::BuiltinFunction(BuiltinFunction::Append)),
                 (String::from("input"), Value::BuiltinFunction(BuiltinFunction::Input)),
                 (String::from("remove"), Value::BuiltinFunction(BuiltinFunction::Remove)),
+                (String::from("to_number"), Value::BuiltinFunction(BuiltinFunction::ToNumber)),
+                (String::from("to_string"), Value::BuiltinFunction(BuiltinFunction::ToString)),
             ])],
         }
     }
@@ -79,7 +80,7 @@ impl Environment {
         for scope in self.scopes.iter_mut().rev() {
             if let Some(object) = scope.get_mut(&pointer.name) {
                 // If there is a value associated with `name`...
-                if pointer.indeces.len() > 0 {
+                if !pointer.indeces.is_empty() {
                     // If indeces were provided...
                     let mut current_element = object;
                     for i in pointer.indeces.iter() {

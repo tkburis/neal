@@ -42,7 +42,7 @@ fn run_prompt() {
     let mut interpreter = Interpreter::new();
     loop {
         print!("> ");
-        io::stdout().flush().expect("Flush failed");  // to flush out "> "
+        io::stdout().flush().expect("Error: flush failed");  // to flush out "> "
         let mut line = String::new();
         io::stdin()
             .read_line(&mut line)

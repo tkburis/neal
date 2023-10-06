@@ -36,7 +36,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Number(x) => write!(f, "{}", x),
-            Self::String_(x) => write!(f, "\"{}\"", x),
+            Self::String_(x) => write!(f, "{}", x),
             Self::Bool(x) => write!(f, "{}", x),
             Self::Array(array) => {
                 write!(f, "[")?;
@@ -69,9 +69,11 @@ impl fmt::Display for Value {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BuiltinFunction {
     Append,
     Input,
     Remove,
+    ToNumber,
+    ToString,
 }

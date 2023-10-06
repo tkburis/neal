@@ -1,6 +1,6 @@
 // use crate::hash_table::HashTable;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen, RightParen,
