@@ -116,23 +116,6 @@ impl Interpreter {
 
             ExprType::Assignment { target, value } => {
                 let value_eval = self.evaluate(value.as_ref())?;
-                // println!("{:?}", self.to_pointer(target));
-                // match &target.expr_type {  // ! BROKEN RN
-                //     ExprType::Element { array, index } => {
-                //         match &array.expr_type {
-                //             ExprType::Array {..} | ExprType::Dictionary {..} => (),  // if target is literal array/dict, don't do anything
-                //             ExprType::Variable { name } => {
-                //                 let index_eval = self.evaluate(index)?;
-                //                 self.environment.update(name.clone(), Some(&index_eval), &value_eval, target.line)?;
-                //             },
-                //             _ => return Err(ErrorType::NotIndexableError { name: None, line: array.line }),
-                //         }
-                //     },
-                //     ExprType::Variable { name } => {
-                //         self.environment.update(name.clone(), None, &value_eval, target.line)?;
-                //     },
-                //     _ => return Err(ErrorType::InvalidAssignmentTarget { line: target.line }),
-                // }
                 match self.construct_assignment_pointer(target, expr.line) {
                     Ok(pointer) => self.environment.update(&pointer, &value_eval, expr.line)?,
                     Err(ErrorType::ThrownLiteralAssignment { .. }) => (),  // If assign to literal, e.g. [1,2][0] = 5, do nothing

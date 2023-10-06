@@ -52,7 +52,6 @@ impl HashTable {
     /// Inserts a key-value pair to the table if the key does not already exist; otherwise, update the existing pair with the new value.
     pub fn insert(&mut self, key: &Value, value: &Value, line: usize) -> Result<(), ErrorType> {
         let bucket_number = self.get_bucket_number(key, line)?;
-        println!("ASSIGNED: {}", bucket_number);
         if let Some(key_value) = self.array[bucket_number].iter_mut().find(|key_value| key_value.key == key.clone()) {
             key_value.value = value.clone();
         } else {
@@ -83,7 +82,6 @@ impl HashTable {
     }
 
     fn get_bucket_number(&self, key: &Value, line: usize) -> Result<usize, ErrorType> {
-        // println!("{} {} -> {}", hash(key, line)?, self.current_capacity, hash(key, line)? % self.current_capacity);
         Ok(hash(key, line)? % self.current_capacity)
     }
 

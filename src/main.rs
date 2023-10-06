@@ -56,13 +56,9 @@ fn run(source: &str, interpreter: &mut Interpreter) {
     let Ok(tokens) = tokenizer.tokenize() else {
         return;
     };
-    // println!("TOKENS: {:?}", tokens);
-    // println!("TOKENS DONE");
     let mut parser = Parser::new(tokens);
     let Ok(ast) = parser.parse() else {
         return;
     };
-    // println!("AST: {:#?}", ast);
-    // println!("AST DONE");
     interpreter.interpret(ast);
 }

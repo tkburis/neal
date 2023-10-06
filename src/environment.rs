@@ -76,7 +76,6 @@ impl Environment {
     }
 
     pub fn update(&mut self, pointer: &AssignmentPointer, value: &Value, line: usize) -> Result<(), ErrorType> {
-        println!("{:?}", pointer);
         for scope in self.scopes.iter_mut().rev() {
             if let Some(object) = scope.get_mut(&pointer.name) {
                 // If there is a value associated with `name`...
