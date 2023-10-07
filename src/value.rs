@@ -71,6 +71,7 @@ impl fmt::Display for Value {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BuiltinFunction {
+    Add,
     Append,
     Input,
     Remove,

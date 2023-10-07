@@ -16,6 +16,7 @@ impl Environment {
     pub fn new() -> Self {
         Self {
             scopes: vec![HashMap::from([
+                (String::from("add"), Value::BuiltinFunction(BuiltinFunction::Add)),
                 (String::from("append"), Value::BuiltinFunction(BuiltinFunction::Append)),
                 (String::from("input"), Value::BuiltinFunction(BuiltinFunction::Input)),
                 (String::from("remove"), Value::BuiltinFunction(BuiltinFunction::Remove)),
