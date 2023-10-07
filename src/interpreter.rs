@@ -386,28 +386,40 @@ impl Interpreter {
 
             ExprType::Element { array, index } => {
                 let index_eval = self.evaluate(index.as_ref())?;
-                match &array.expr_type {
-                    ExprType::Array { elements } => {
-                        let index_num = environment::index_value_to_usize(&index_eval, expr.line)?;
-                        if let Some(element_expr) = elements.get(index_num) {
-                            self.evaluate(element_expr)
+                match self.evaluate(array.as_ref())? {
+                    Value::Array(array) => {
+                        let index_num = environment::index_value_to_usize(&index_eval, index.line)?;
+                        if let Some(element) = array.get(index_num) {
+                            Ok(element.clone())
                         } else {
                             Err(ErrorType::OutOfBoundsIndexError { name: None, index: index_num, line: expr.line })
                         }
                     },
-                    ExprType::Dictionary { elements } => {
-                        for key_value_expr in elements.iter().rev() {  // Go in reverse to emulate normal `replacing` behaviour.
-                            let key_eval = self.evaluate(&key_value_expr.key)?;
-                            if index_eval == key_eval {
-                                return self.evaluate(&key_value_expr.value);
-                            }
-                        }
-                        Err(ErrorType::KeyError { key: index_eval, line: expr.line })
+                    Value::Dictionary(dict) => {
+                        dict.get(&index_eval, expr.line).cloned()
                     },
-                    ExprType::Variable { name } => {
-                        self.environment.get(name.clone(), Some(index_eval), expr.line)
-                    },
-                    _ => Err(ErrorType::NotIndexableError { name: None, line: array.line }),
+                    _ => Err(ErrorType::NotIndexableError { name: None, line: array.line })
+                    // ExprType::Array { elements } => {
+                    //     let index_num = environment::index_value_to_usize(&index_eval, expr.line)?;
+                    //     if let Some(element_expr) = elements.get(index_num) {
+                    //         self.evaluate(element_expr)
+                    //     } else {
+                    //         Err(ErrorType::OutOfBoundsIndexError { name: None, index: index_num, line: expr.line })
+                    //     }
+                    // },
+                    // ExprType::Dictionary { elements } => {
+                    //     for key_value_expr in elements.iter().rev() {  // Go in reverse to emulate normal `replacing` behaviour.
+                    //         let key_eval = self.evaluate(&key_value_expr.key)?;
+                    //         if index_eval == key_eval {
+                    //             return self.evaluate(&key_value_expr.value);
+                    //         }
+                    //     }
+                    //     Err(ErrorType::KeyError { key: index_eval, line: expr.line })
+                    // },
+                    // ExprType::Variable { name } => {
+                    //     self.environment.get(name.clone(), Some(index_eval), expr.line)
+                    // },
+                    // _ => Err(ErrorType::NotIndexableError { name: None, line: array.line }),
                 }
             },
 
