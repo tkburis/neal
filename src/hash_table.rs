@@ -74,6 +74,10 @@ impl HashTable {
         }
     }
 
+    pub fn size(&self) -> usize {
+        self.entries
+    }
+
     fn check_load(&mut self) {
         if self.current_capacity < MAX_CAPACITY && self.entries * LOAD_FACTOR_DENOMINATOR > self.current_capacity * LOAD_FACTOR_NUMERATOR {
             self.array.append(&mut vec![Vec::new(); self.current_capacity]);

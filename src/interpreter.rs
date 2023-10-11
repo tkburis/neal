@@ -348,6 +348,19 @@ impl Interpreter {
                                     _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array or Dictionary"), got: target_eval.type_to_string(), line: target.line }),
                                 }
                             },
+                            BuiltinFunction::Size => {
+                                if arguments.len() != 1 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                }
+
+                                let value = self.evaluate(&arguments[0])?;
+                                match value {
+                                    Value::Array(array) => Ok(Value::Number(array.len() as f64)),
+                                    Value::Dictionary(dict) => Ok(Value::Number(dict.size() as f64)),
+                                    Value::String_(s) => Ok(Value::Number(s.len() as f64)),
+                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array, Dictionary or String"), got: value.type_to_string(), line: expr.line }),
+                                }
+                            }
                             BuiltinFunction::ToNumber => {
                                 if arguments.len() != 1 {
                                     return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
