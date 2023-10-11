@@ -168,3 +168,6 @@ fn hash(key: &Value, line: usize) -> Result<usize, ErrorType> {
         },
     }
 }
+
+
+// TODO: tests
