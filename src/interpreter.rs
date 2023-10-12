@@ -432,6 +432,14 @@ impl Interpreter {
                     Value::Dictionary(dict) => {
                         dict.get(&index_eval, expr.line).cloned()
                     },
+                    Value::String_(s) => {
+                        let index_num = environment::index_value_to_usize(&index_eval, index.line)?;
+                        if let Some(c) = s.chars().nth(index_num) {
+                            Ok(Value::String_(String::from(c)))
+                        } else {
+                            Err(ErrorType::OutOfBoundsIndexError { name: None, index: index_num, line: expr.line })
+                        }
+                    },
                     _ => Err(ErrorType::NotIndexableError { name: None, line: array.line })
                     // ExprType::Array { elements } => {
                     //     let index_num = environment::index_value_to_usize(&index_eval, expr.line)?;

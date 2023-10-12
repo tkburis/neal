@@ -51,7 +51,7 @@ pub enum ErrorType {
         name: Option<String>,
         line: usize,
     },
-    OutOfBoundsIndexError {  // TODO: Maybe no need for name.
+    OutOfBoundsIndexError {
         name: Option<String>,
         index: usize,
         line: usize,
@@ -181,7 +181,7 @@ fn print_report(error: &ErrorType) {
             if let Some(n) = name {
                 println!("Line {0}: index `{1}` is out of bounds for `{2}`.", line, index, n);
             } else {
-                println!("Line {0}: index `{1}` is out of bounds for array.", line, index)
+                println!("Line {0}: index `{1}` is out of bounds.", line, index)
             }
         },
         ErrorType::ExpectedTypeError { ref expected, ref got, line } => {
