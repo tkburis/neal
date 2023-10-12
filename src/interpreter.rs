@@ -507,7 +507,7 @@ impl Interpreter {
             },
 
             ExprType::Variable { name } => {
-                self.environment.get(name.clone(), None, expr.line)
+                self.environment.get(name.clone(), expr.line)
             },
         }
     }
@@ -523,7 +523,7 @@ impl Interpreter {
             ExprType::Variable { name } => {
                 Ok(AssignmentPointer {name: name.clone(), indeces: Vec::new()})
             },
-            ExprType::Array {..} | ExprType::Dictionary {..} => Err(ErrorType::ThrownLiteralAssignment { line }),
+            ExprType::Array {..} | ExprType::Call {..} | ExprType::Dictionary {..} => Err(ErrorType::ThrownLiteralAssignment { line }),
             _ => Err(ErrorType::InvalidAssignmentTarget { line }),
         }
     }

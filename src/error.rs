@@ -56,6 +56,9 @@ pub enum ErrorType {
         index: usize,
         line: usize,
     },
+    InsertNonStringIntoStringError {
+        line: usize,
+    },
     
     // Runtime errors.
     ExpectedTypeError {
@@ -183,6 +186,9 @@ fn print_report(error: &ErrorType) {
             } else {
                 println!("Line {0}: index `{1}` is out of bounds.", line, index)
             }
+        },
+        ErrorType::InsertNonStringIntoStringError { line } => {
+            println!("Line {}: attempted to insert a non-String into a String.", line);
         },
         ErrorType::ExpectedTypeError { ref expected, ref got, line } => {
             println!("Line {0}: expected type {1}, instead got type {2}", line, expected, got);

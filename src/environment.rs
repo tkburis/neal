@@ -46,32 +46,11 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: String, index: Option<Value>, line: usize) -> Result<Value, ErrorType> {
+    pub fn get(&self, name: String, line: usize) -> Result<Value, ErrorType> {
         for scope in self.scopes.iter().rev() {
             if let Some(object) = scope.get(&name) {
                 // If there is a value associated with `name`...
-                if let Some(key) = index {
-                    // If an index is provided...
-                    return match object {
-                        Value::Array(array) => {
-                            let idx = index_value_to_usize(&key, line)?;
-                            if let Some(element) = array.get(idx) {
-                                Ok(element.clone())
-                            } else {
-                                // If the index provided is out-of-bounds or similar...
-                                Err(ErrorType::OutOfBoundsIndexError { name: Some(name), index: idx, line })
-                            }
-                        },
-                        Value::Dictionary(dict) => {
-                            dict.get(&key, line).cloned()
-                        },
-                        // If an index is provided but the value is not an array...
-                        _ => Err(ErrorType::NotIndexableError { name: Some(name), line }),
-                    };
-                } else {
-                    // No index was provided.
-                    return Ok(object.clone());
-                }
+                return Ok(object.clone());
             }
         }
         Err(ErrorType::NameError { name, line })
@@ -84,7 +63,7 @@ impl Environment {
                 if !pointer.indeces.is_empty() {
                     // If indeces were provided...
                     let mut current_element = object;
-                    for i in pointer.indeces.iter() {
+                    for i in pointer.indeces.iter().take(pointer.indeces.len() - 1) {  // all but last element
                         match current_element {
                             Value::Array(array) => {
                                 let idx = index_value_to_usize(i, line)?;
@@ -102,7 +81,34 @@ impl Environment {
                         }
                     }
 
-                    *current_element = value.clone();
+                    let last_index = pointer.indeces.last().unwrap();
+                    match current_element {
+                        Value::Array(array) => {
+                            let idx = index_value_to_usize(last_index, line)?;
+                            if let Some(el) = array.get_mut(idx) {
+                                current_element = el;
+                            } else {
+                                // If the index provided is out-of-bounds or similar...
+                                return Err(ErrorType::OutOfBoundsIndexError { name: None, index: idx, line })
+                            }
+                            *current_element = value.clone();
+                        },
+                        Value::Dictionary(dict) => {
+                            dict.insert(last_index, value, line)?;
+                        },
+                        Value::String_(s) => {
+                            let idx = index_value_to_usize(last_index, line)?;
+                            if s.get(idx..idx+1).is_none() {
+                                return Err(ErrorType::OutOfBoundsIndexError { name: None, index: idx, line });
+                            }
+                            if let Value::String_(c) = value {
+                                s.replace_range(idx..idx+1, c);
+                            } else {
+                                return Err(ErrorType::InsertNonStringIntoStringError { line });
+                            }
+                        },
+                        _ => return Err(ErrorType::NotIndexableError { name: None, line }),
+                    }
 
                     return Ok(());
                 } else {
@@ -144,28 +150,12 @@ mod tests {
         let mut env = Environment::new();
         env.declare(String::from("a"), &Value::Number(5.0));
         env.declare(String::from("b"), &Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))]));
-        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(5.0)));
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))])));
+        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(5.0)));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))])));
 
         let _ = env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::String_(String::from("abc")), 1);
-        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(5.0)));
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::String_(String::from("abc"))));
-    }
-
-    #[test]
-    fn one_scope_element() {
-        // var a = [1, true, "abc"]
-        // "a[1] == true?"
-        // a[0] = 5
-        // "a[0] == 5?"
-        // "a == [5, true, "abc"]?"
-        let mut env = Environment::new();
-        env.declare(String::from("a"), &Value::Array(vec![Value::Number(1.0), Value::Bool(true), Value::String_(String::from("abc"))]));
-        assert_eq!(env.get(String::from("a"), Some(Value::Number(1.0)), 1), Ok(Value::Bool(true)));
-
-        let _ = env.update(&AssignmentPointer { name: String::from("a"), indeces: vec![Value::Number(0.0)] }, &Value::Number(5.0), 1);
-        assert_eq!(env.get(String::from("a"), Some(Value::Number(0.0)), 1), Ok(Value::Number(5.0)));
-        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Array(vec![Value::Number(5.0), Value::Bool(true), Value::String_(String::from("abc"))])));
+        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(5.0)));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::String_(String::from("abc"))));
     }
 
     #[test]
@@ -192,25 +182,25 @@ mod tests {
         env.new_scope();
         let _ = env.update(&AssignmentPointer { name: String::from("a"), indeces: vec![] }, &Value::Number(10.0), 1);
         env.declare(String::from("b"), &Value::Number(20.0));
-        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(10.0)));
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(20.0)));
+        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(10.0)));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(20.0)));
 
         env.new_scope();
         let _ = env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::Number(30.0), 1);
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(30.0)));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(30.0)));
 
         env.exit_scope();
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(30.0)));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(30.0)));
 
         env.exit_scope();
-        assert_eq!(env.get(String::from("a"), None, 1), Ok(Value::Number(10.0)));
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(2.0)));
+        assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(10.0)));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(2.0)));
     }
 
     #[test]
     fn name_error_get() {
         let env = Environment::new();
-        assert_eq!(env.get(String::from("b"), None, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
+        assert_eq!(env.get(String::from("b"), 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
     }
 
     #[test]
@@ -224,15 +214,6 @@ mod tests {
         let mut env = Environment::new();
         env.declare(String::from("b"), &Value::Number(123.0));
         env.declare(String::from("b"), &Value::Number(55.0));
-        assert_eq!(env.get(String::from("b"), None, 1), Ok(Value::Number(55.0)));
-    }
-
-    #[test]
-    fn get_element_errors() {
-        let mut env = Environment::new();
-        env.declare(String::from("a"), &Value::Array(vec![Value::Number(1.0), Value::Bool(true), Value::String_(String::from("abc"))]));
-        env.declare(String::from("b"), &Value::Number(123.0));
-        assert_eq!(env.get(String::from("a"), Some(Value::Number(5.0)), 1), Err(ErrorType::OutOfBoundsIndexError { name: Some(String::from("a")), index: 5, line: 1 }));
-        assert_eq!(env.get(String::from("b"), Some(Value::Number(5.0)), 1), Err(ErrorType::NotIndexableError { name: Some(String::from("b")), line: 1 }));
+        assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(55.0)));
     }
 }
