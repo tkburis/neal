@@ -27,7 +27,8 @@ enum State {
     GotGreaterEqual,
     GotLess,
     GotLessEqual,
-    InString,
+    InStringDouble,
+    InStringSingle,
     GotString,
     InNumberBeforeDot,
     InNumberAfterDot,
@@ -118,7 +119,9 @@ impl<'a> Tokenizer<'a> {
                             '<' => self.current_state = State::GotLess,
     
                             // Literals.
-                            '"' => self.current_state = State::InString,
+                            '"' => self.current_state = State::InStringDouble,
+                            '\'' => self.current_state = State::InStringSingle,
+
                             '0'..='9' => self.current_state = State::InNumberBeforeDot,
     
                             // Identifiers and keywords.
@@ -206,8 +209,16 @@ impl<'a> Tokenizer<'a> {
                 State::GotGreaterEqual => return Ok(Some(self.construct_token(TokenType::GreaterEqual))),
                 State::GotLessEqual => return Ok(Some(self.construct_token(TokenType::LessEqual))),
                 
-                State::InString => {
+                State::InStringDouble => {
                     if current_char_opt == Some('"') {
+                        self.current_state = State::GotString;
+                    } else if current_char_opt.is_none() {
+                        // We have reached the end and there was no closing `"`.
+                        return Err(ErrorType::UnterminatedString);
+                    }
+                },
+                State::InStringSingle => {
+                    if current_char_opt == Some('\'') {
                         self.current_state = State::GotString;
                     } else if current_char_opt.is_none() {
                         // We have reached the end and there was no closing `"`.
