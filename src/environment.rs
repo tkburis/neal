@@ -16,7 +16,6 @@ impl Environment {
     pub fn new() -> Self {
         Self {
             scopes: vec![HashMap::from([
-                (String::from("add"), Value::BuiltinFunction(BuiltinFunction::Add)),
                 (String::from("append"), Value::BuiltinFunction(BuiltinFunction::Append)),
                 (String::from("input"), Value::BuiltinFunction(BuiltinFunction::Input)),
                 (String::from("remove"), Value::BuiltinFunction(BuiltinFunction::Remove)),
@@ -81,6 +80,8 @@ impl Environment {
                         }
                     }
 
+                    // Why? So that a[1][5] = 1 inserts `5` as a key if it does not exist already.
+                    // For strings, you have to do it this way to allow a[1] = 'h'.
                     let last_index = pointer.indeces.last().unwrap();
                     match current_element {
                         Value::Array(array) => {

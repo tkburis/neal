@@ -260,27 +260,6 @@ impl Interpreter {
                     },
                     Value::BuiltinFunction(function) => {
                         match function {
-                            BuiltinFunction::Add => {
-                                if arguments.len() != 3 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 3, line: expr.line })
-                                }
-
-                                let target = &arguments[0];
-                                let key_eval = self.evaluate(&arguments[1])?;
-                                let value_eval = self.evaluate(&arguments[2])?;
-
-                                let target_eval = self.evaluate(target)?;
-                                let pointer = self.construct_assignment_pointer(target, target.line)?;
-
-                                if let Value::Dictionary(mut dict) = target_eval {
-                                    dict.insert(&key_eval, &value_eval, expr.line)?;
-                                    self.environment.update(&pointer, &Value::Dictionary(dict.clone()), expr.line)?;
-
-                                    Ok(Value::Dictionary(dict))
-                                } else {
-                                    Err(ErrorType::ExpectedTypeError { expected: String::from("Dictionary"), got: target_eval.type_to_string(), line: target.line })
-                                }
-                            },
                             BuiltinFunction::Append => {
                                 if arguments.len() != 2 {
                                     return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line })
