@@ -148,6 +148,16 @@ impl<'a> Tokenizer<'a> {
                     }
                 },
 
+                State::InComment => {
+                    // If we have a new line or we have reached the end of the file, the comment has ended.
+                    if current_char_opt == Some('\n') {
+                        self.current_line += 1;
+                        self.current_state = State::NoOp;
+                    } else if current_char_opt.is_none() {
+                        self.current_state = State::NoOp;
+                    }
+                },
+
                 State::GotLeftParen => return Ok(Some(self.construct_token(TokenType::LeftParen))),
                 State::GotRightParen => return Ok(Some(self.construct_token(TokenType::RightParen))),
                 State::GotLeftCurly => return Ok(Some(self.construct_token(TokenType::LeftCurly))),
@@ -164,24 +174,6 @@ impl<'a> Tokenizer<'a> {
                 State::GotSlash => return Ok(Some(self.construct_token(TokenType::Slash))),
                 State::GotStar => return Ok(Some(self.construct_token(TokenType::Star))),
 
-                State::InComment => {
-                    // If we have a new line or we have reached the end of the file, the comment has ended.
-                    if current_char_opt == Some('\n') {
-                        self.current_line += 1;
-                        self.current_state = State::NoOp;
-                    } else if current_char_opt.is_none() {
-                        self.current_state = State::NoOp;
-                    }
-                },
-
-                State::GotBang => {
-                    if current_char_opt == Some('=') {
-                        self.current_state = State::GotBangEqual;
-                    } else {
-                        // If the character isn't `=` or we are at the end, just make `Bang` token.
-                        return Ok(Some(self.construct_token(TokenType::Bang)));
-                    }
-                },
                 State::GotEqual => {
                     if current_char_opt == Some('=') {
                         self.current_state = State::GotEqualEqual;
@@ -272,6 +264,7 @@ impl<'a> Tokenizer<'a> {
                         }
                     }
                 },
+                
                 State::InWord => {
                     if current_char_opt.map_or(true, |current_char| !(current_char.is_ascii_alphanumeric() || current_char == '_')) {
                         // Construct the token if we are at the end of the file OR if current character is NOT alphanumeric or an `_`.
@@ -279,7 +272,6 @@ impl<'a> Tokenizer<'a> {
                         return Ok(Some(match lexeme {
                             "and" => self.construct_token(TokenType::And),
                             "break" => self.construct_token(TokenType::Break),
-                            "class" => self.construct_token(TokenType::Class),
                             "else" => self.construct_token(TokenType::Else),
                             "false" => self.construct_token(TokenType::False),
                             "func" => self.construct_token(TokenType::Func),
@@ -289,12 +281,20 @@ impl<'a> Tokenizer<'a> {
                             "or" => self.construct_token(TokenType::Or),
                             "print" => self.construct_token(TokenType::Print),
                             "return" => self.construct_token(TokenType::Return),
-                            "self" => self.construct_token(TokenType::Self_),
                             "true" => self.construct_token(TokenType::True),
                             "var" => self.construct_token(TokenType::Var),
                             "while" => self.construct_token(TokenType::While),
                             _ => self.construct_token(TokenType::Identifier)
                         }));
+                    }
+                },
+
+                State::GotBang => {
+                    if current_char_opt == Some('=') {
+                        self.current_state = State::GotBangEqual;
+                    } else {
+                        // If the character isn't `=` or we are at the end, just make `Bang` token.
+                        return Ok(Some(self.construct_token(TokenType::Bang)));
                     }
                 },
 
