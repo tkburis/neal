@@ -148,16 +148,6 @@ impl<'a> Tokenizer<'a> {
                     }
                 },
 
-                State::InComment => {
-                    // If we have a new line or we have reached the end of the file, the comment has ended.
-                    if current_char_opt == Some('\n') {
-                        self.current_line += 1;
-                        self.current_state = State::NoOp;
-                    } else if current_char_opt.is_none() {
-                        self.current_state = State::NoOp;
-                    }
-                },
-
                 State::GotLeftParen => return Ok(Some(self.construct_token(TokenType::LeftParen))),
                 State::GotRightParen => return Ok(Some(self.construct_token(TokenType::RightParen))),
                 State::GotLeftCurly => return Ok(Some(self.construct_token(TokenType::LeftCurly))),
@@ -264,7 +254,7 @@ impl<'a> Tokenizer<'a> {
                         }
                     }
                 },
-                
+
                 State::InWord => {
                     if current_char_opt.map_or(true, |current_char| !(current_char.is_ascii_alphanumeric() || current_char == '_')) {
                         // Construct the token if we are at the end of the file OR if current character is NOT alphanumeric or an `_`.
@@ -295,6 +285,16 @@ impl<'a> Tokenizer<'a> {
                     } else {
                         // If the character isn't `=` or we are at the end, just make `Bang` token.
                         return Ok(Some(self.construct_token(TokenType::Bang)));
+                    }
+                },
+                
+                State::InComment => {
+                    // If we have a new line or we have reached the end of the file, the comment has ended.
+                    if current_char_opt == Some('\n') {
+                        self.current_line += 1;
+                        self.current_state = State::NoOp;
+                    } else if current_char_opt.is_none() {
+                        self.current_state = State::NoOp;
                     }
                 },
 
