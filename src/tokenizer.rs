@@ -164,6 +164,15 @@ impl<'a> Tokenizer<'a> {
                 State::GotSemicolon => return Ok(Some(self.construct_token(TokenType::Semicolon))),
                 State::GotSlash => return Ok(Some(self.construct_token(TokenType::Slash))),
                 State::GotStar => return Ok(Some(self.construct_token(TokenType::Star))),
+                
+                State::GotBang => {
+                    if current_char_opt == Some('=') {
+                        self.current_state = State::GotBangEqual;
+                    } else {
+                        // If the character isn't `=` or we are at the end, just make `Bang` token.
+                        return Ok(Some(self.construct_token(TokenType::Bang)));
+                    }
+                },
 
                 State::GotEqual => {
                     if current_char_opt == Some('=') {
@@ -277,15 +286,6 @@ impl<'a> Tokenizer<'a> {
                             "while" => self.construct_token(TokenType::While),
                             _ => self.construct_token(TokenType::Identifier)
                         }));
-                    }
-                },
-
-                State::GotBang => {
-                    if current_char_opt == Some('=') {
-                        self.current_state = State::GotBangEqual;
-                    } else {
-                        // If the character isn't `=` or we are at the end, just make `Bang` token.
-                        return Ok(Some(self.construct_token(TokenType::Bang)));
                     }
                 },
                 
