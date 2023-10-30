@@ -109,24 +109,25 @@ impl<'a> Tokenizer<'a> {
                             ';' => self.current_state = State::GotSemicolon,
                             '/' => self.current_state = State::GotSlash,
                             '*' => self.current_state = State::GotStar,
-    
-                            '#' => self.current_state = State::InComment,
-    
+                            
                             // We have to see the next character to be able to correctly identify the token.
                             '!' => self.current_state = State::GotBang,
                             '=' => self.current_state = State::GotEqual,
                             '>' => self.current_state = State::GotGreater,
                             '<' => self.current_state = State::GotLess,
-    
+                            
                             // Literals.
                             '"' => self.current_state = State::InStringDouble,
                             '\'' => self.current_state = State::InStringSingle,
-
+                            
                             '0'..='9' => self.current_state = State::InNumberBeforeDot,
-    
+                            
                             // Identifiers and keywords.
                             'a'..='z' | 'A'..='Z' | '_' => self.current_state = State::InWord,
     
+                            // Comments
+                            '#' => self.current_state = State::InComment,
+
                             // Whitespace.
                             ' ' | '\r' | '\t' => self.current_state = State::NoOp,
     
