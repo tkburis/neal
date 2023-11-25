@@ -5,7 +5,7 @@ use crate::{value::{Value, BuiltinFunction}, error::ErrorType};
 #[derive(Debug)]
 pub struct AssignmentPointer {
     pub name: String,
-    pub indeces: Vec<Value>,
+    pub indices: Vec<Value>,
 }
 
 pub struct Environment {
@@ -59,10 +59,10 @@ impl Environment {
         for scope in self.scopes.iter_mut().rev() {
             if let Some(object) = scope.get_mut(&pointer.name) {
                 // If there is a value associated with `name`...
-                if !pointer.indeces.is_empty() {
+                if !pointer.indices.is_empty() {
                     // If indeces were provided...
                     let mut current_element = object;
-                    for i in pointer.indeces.iter().take(pointer.indeces.len() - 1) {  // all but last element
+                    for i in pointer.indices.iter().take(pointer.indices.len() - 1) {  // all but last element
                         match current_element {
                             Value::Array(array) => {
                                 let idx = index_value_to_usize(i, line)?;
@@ -82,7 +82,7 @@ impl Environment {
 
                     // Why? So that a[1][5] = 1 inserts `5` as a key if it does not exist already.
                     // For strings, you have to do it this way to allow a[1] = 'h'.
-                    let last_index = pointer.indeces.last().unwrap();
+                    let last_index = pointer.indices.last().unwrap();
                     match current_element {
                         Value::Array(array) => {
                             let idx = index_value_to_usize(last_index, line)?;
@@ -154,7 +154,7 @@ mod tests {
         assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(5.0)));
         assert_eq!(env.get(String::from("b"), 1), Ok(Value::Array(vec![Value::Bool(true), Value::String_(String::from("hello world!"))])));
 
-        let _ = env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::String_(String::from("abc")), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("b"), indices: vec![] }, &Value::String_(String::from("abc")), 1);
         assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(5.0)));
         assert_eq!(env.get(String::from("b"), 1), Ok(Value::String_(String::from("abc"))));
     }
@@ -181,13 +181,13 @@ mod tests {
         env.declare(String::from("b"), &Value::Number(2.0));
 
         env.new_scope();
-        let _ = env.update(&AssignmentPointer { name: String::from("a"), indeces: vec![] }, &Value::Number(10.0), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("a"), indices: vec![] }, &Value::Number(10.0), 1);
         env.declare(String::from("b"), &Value::Number(20.0));
         assert_eq!(env.get(String::from("a"), 1), Ok(Value::Number(10.0)));
         assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(20.0)));
 
         env.new_scope();
-        let _ = env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::Number(30.0), 1);
+        let _ = env.update(&AssignmentPointer { name: String::from("b"), indices: vec![] }, &Value::Number(30.0), 1);
         assert_eq!(env.get(String::from("b"), 1), Ok(Value::Number(30.0)));
 
         env.exit_scope();
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn name_error_assign() {
         let mut env = Environment::new();
-        assert_eq!(env.update(&AssignmentPointer { name: String::from("b"), indeces: vec![] }, &Value::Null, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
+        assert_eq!(env.update(&AssignmentPointer { name: String::from("b"), indices: vec![] }, &Value::Null, 1), Err(ErrorType::NameError { name: String::from("b"), line: 1 }));
     }
 
     #[test]

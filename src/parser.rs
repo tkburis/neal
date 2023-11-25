@@ -311,7 +311,7 @@ impl Parser {
         self.assignment()
     }
 
-    // assignment -> or "=" assignment
+    // assignment -> or ("=" assignment)?
     // `or ("=" or)*` is NOT correct because it will build from the left.
     // E.g., `a = b = 5` -> `(a = b) = 5` which will cause problems in interpreter.
     // Given that LHS is either `Variable` or `Element`.
@@ -403,12 +403,12 @@ impl Parser {
         Ok(expr)
     }
 
-    // comparison -> addsub ( (">" | "<" | ">=" | "<=") addsub)*
+    // comparison -> plus_minus ( (">" | "<" | ">=" | "<=") plus_minus)*
     fn comparison(&mut self) -> Result<Expr, ErrorType> {
-        let mut expr = self.add_sub()?;
+        let mut expr = self.plus_minus()?;
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Greater, TokenType::Less, TokenType::GreaterEqual, TokenType::LessEqual]) {
-            let right = self.add_sub()?;
+            let right = self.plus_minus()?;
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
@@ -421,12 +421,12 @@ impl Parser {
         Ok(expr)
     }
 
-    // add_sub -> multdiv ( ("+" | "-") multdiv)*
-    fn add_sub(&mut self) -> Result<Expr, ErrorType> {
-        let mut expr = self.mult_div_mod()?;
+    // plus_minus -> star_slash_percent ( ("+" | "-") star_slash_percent)*
+    fn plus_minus(&mut self) -> Result<Expr, ErrorType> {
+        let mut expr = self.star_slash_percent()?;
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Plus, TokenType::Minus]) {
-            let right = self.mult_div_mod()?;
+            let right = self.star_slash_percent()?;
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
@@ -439,8 +439,8 @@ impl Parser {
         Ok(expr)
     }
 
-    // mult_div_mod -> unary ( ("*" | "/") unary)*
-    fn mult_div_mod(&mut self) -> Result<Expr, ErrorType> {
+    // star_slash_percent -> unary ( ("*" | "/" | "%") unary)*
+    fn star_slash_percent(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.unary()?;
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Star, TokenType::Slash, TokenType::Percent]) {
@@ -475,7 +475,7 @@ impl Parser {
         }
     }
 
-    // element -> call ("[" integer "]")*
+    // element -> call ("[" expr "]")*
     fn element(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.call()?;  // This is the array.
         
@@ -545,17 +545,7 @@ impl Parser {
     //            "{" (expr ":" expr ("," expr ":" expr)*)? "}" |
 	//            identifier
     fn primary(&mut self) -> Result<Expr, ErrorType> {
-        if self.check_and_consume(&[TokenType::True]).is_some() {
-            // Literals.
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Bool(true) }})
-
-        } else if self.check_and_consume(&[TokenType::False]).is_some() {
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Bool(false) }})
-
-        } else if self.check_and_consume(&[TokenType::Null]).is_some() {
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Null }})
-
-        } else if let Some(token) = self.check_and_consume(&[TokenType::String_, TokenType::Number]) {
+        if let Some(token) = self.check_and_consume(&[TokenType::String_, TokenType::Number, TokenType::True, TokenType::False, TokenType::Null]) {
             Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: token.literal }})
 
         } else if self.check_and_consume(&[TokenType::LeftParen]).is_some() {

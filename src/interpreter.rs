@@ -494,13 +494,13 @@ impl Interpreter {
     fn construct_assignment_pointer(&mut self, element: &Expr, line: usize) -> Result<AssignmentPointer, ErrorType> {
         match &element.expr_type {
             ExprType::Element { array, index } => {
-                let AssignmentPointer {name, indeces} = self.construct_assignment_pointer(array.as_ref(), line)?;
+                let AssignmentPointer {name, indices: indeces} = self.construct_assignment_pointer(array.as_ref(), line)?;
                 let mut indeces_copy = indeces;
                 indeces_copy.push(self.evaluate(index.as_ref())?);
-                Ok(AssignmentPointer {name, indeces: indeces_copy})
+                Ok(AssignmentPointer {name, indices: indeces_copy})
             },
             ExprType::Variable { name } => {
-                Ok(AssignmentPointer {name: name.clone(), indeces: Vec::new()})
+                Ok(AssignmentPointer {name: name.clone(), indices: Vec::new()})
             },
             ExprType::Array {..} | ExprType::Call {..} | ExprType::Dictionary {..} => Err(ErrorType::ThrownLiteralAssignment { line }),
             _ => Err(ErrorType::InvalidAssignmentTarget { line }),
