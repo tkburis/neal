@@ -1,6 +1,6 @@
 use std::io::{Write, self};
 
-use crate::{environment::{Environment, AssignmentPointer, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::{Value, BuiltinFunction}, hash_table::HashTable};
+use crate::{environment::{Environment, Pointer, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::{Value, BuiltinFunction}, hash_table::HashTable};
 
 pub struct Interpreter {
     environment: Environment,
@@ -116,7 +116,7 @@ impl Interpreter {
 
             ExprType::Assignment { target, value } => {
                 let value_eval = self.evaluate(value.as_ref())?;
-                match self.construct_assignment_pointer(target, expr.line) {
+                match self.construct_pointer(target, expr.line) {
                     Ok(pointer) => self.environment.update(&pointer, &value_eval, expr.line)?,
                     Err(ErrorType::ThrownLiteralAssignment { .. }) => (),  // If assign to literal, e.g. [1,2][0] = 5, do nothing
                     Err(e) => return Err(e),
@@ -269,7 +269,7 @@ impl Interpreter {
                                 let value_eval = self.evaluate(&arguments[1])?;
 
                                 let target_eval = self.evaluate(target)?;
-                                let pointer = self.construct_assignment_pointer(target, target.line)?;
+                                let pointer = self.construct_pointer(target, target.line)?;
                                 if let Value::Array(mut array) = target_eval {
                                     array.push(value_eval);
                                     self.environment.update(&pointer, &Value::Array(array.clone()), expr.line)?;
@@ -303,7 +303,7 @@ impl Interpreter {
                                 let key_eval = self.evaluate(&arguments[1])?;
 
                                 let target_eval = self.evaluate(target)?;
-                                let pointer = self.construct_assignment_pointer(target, target.line)?;
+                                let pointer = self.construct_pointer(target, target.line)?;
                                 match target_eval {
                                     Value::Array(mut array) => {
                                         let index = environment::index_value_to_usize(&key_eval, arguments[1].line)?;
@@ -491,16 +491,16 @@ impl Interpreter {
         }
     }
 
-    fn construct_assignment_pointer(&mut self, element: &Expr, line: usize) -> Result<AssignmentPointer, ErrorType> {
+    fn construct_pointer(&mut self, element: &Expr, line: usize) -> Result<Pointer, ErrorType> {
         match &element.expr_type {
             ExprType::Element { array, index } => {
-                let AssignmentPointer {name, indices: indeces} = self.construct_assignment_pointer(array.as_ref(), line)?;
-                let mut indeces_copy = indeces;
-                indeces_copy.push(self.evaluate(index.as_ref())?);
-                Ok(AssignmentPointer {name, indices: indeces_copy})
+                let Pointer {name, indices} = self.construct_pointer(array.as_ref(), line)?;
+                let mut indices_copy = indices;
+                indices_copy.push(self.evaluate(index.as_ref())?);
+                Ok(Pointer {name, indices: indices_copy})
             },
             ExprType::Variable { name } => {
-                Ok(AssignmentPointer {name: name.clone(), indices: Vec::new()})
+                Ok(Pointer {name: name.clone(), indices: Vec::new()})
             },
             ExprType::Array {..} | ExprType::Call {..} | ExprType::Dictionary {..} => Err(ErrorType::ThrownLiteralAssignment { line }),
             _ => Err(ErrorType::InvalidAssignmentTarget { line }),

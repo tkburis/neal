@@ -59,7 +59,7 @@ impl HashTable {
             self.array[bucket_number].push(KeyValue { key: key.clone(), value: value.clone() });
         }
 
-        self.check_load();
+        self.check_load(line)?;
         Ok(())
     }
 
@@ -78,11 +78,17 @@ impl HashTable {
         self.entries
     }
 
-    fn check_load(&mut self) {
+    fn check_load(&mut self, line: usize) -> Result<(), ErrorType> {
         if self.current_capacity < MAX_CAPACITY && self.entries * LOAD_FACTOR_DENOMINATOR > self.current_capacity * LOAD_FACTOR_NUMERATOR {
-            self.array.append(&mut vec![Vec::new(); self.current_capacity]);
+            let copy = self.flatten();
             self.current_capacity <<= 1;
+            self.array = vec![Vec::new(); self.current_capacity];
+
+            for entry in copy.iter() {
+                self.insert(&entry.key, &entry.value, line)?;
+            }
         }
+        Ok(())
     }
 
     fn get_bucket_number(&self, key: &Value, line: usize) -> Result<usize, ErrorType> {
@@ -130,7 +136,7 @@ impl Debug for HashTable {
 fn hash(key: &Value, line: usize) -> Result<usize, ErrorType> {
     match key {
         Value::Array(array) => {
-            let mut hash_value: usize = 0;
+            let mut hash_value: usize = 5381;
             for (index, val) in array.iter().take(20).enumerate() {  // limit to 20 so O(1)
                 // http://www.cse.yorku.ca/~oz/hash.html
                 let curr = (hash(val, line)? * index) % MAX_CALC;
@@ -159,7 +165,7 @@ fn hash(key: &Value, line: usize) -> Result<usize, ErrorType> {
             Ok(binary as usize)
         },
         Value::String_(s) => {
-            let mut hash_value = 0;
+            let mut hash_value = 5381;
             for (index, c) in s.chars().take(20).enumerate() {
                 // http://www.cse.yorku.ca/~oz/hash.html
                 hash_value = (((hash_value << 5) + hash_value) + (c as usize * index)) % MAX_CALC;
