@@ -4,6 +4,7 @@ use crate::hash_table::KeyValue;
 use crate::stmt::{Stmt, StmtType};
 use crate::token::{Token, TokenType, Literal};
 
+/// Performs syntax analysis.
 pub struct Parser {
     tokens: Vec<Token>,
     current_index: usize,
@@ -11,6 +12,7 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// Initialises a new instance of `Parser`, given the sequence of tokens.
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             tokens,
@@ -19,15 +21,19 @@ impl Parser {
         }
     }
 
-    // TODO: clean up error reports; `advance` method (increment index and line)
-    // TODO: error handling; stmts
+    /// Returns the abstract syntax tree of the source code as a sequence of statements.
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<ErrorType>> {
-        let mut statements: Vec<Stmt> = Vec::new();
+        let mut statements: Vec<Stmt> = Vec::new();  // The abstract syntax tree.
+
+        // We aim to collect as many errors as possible in one run into a vector and report them all at the same time.
         let mut errors: Vec<ErrorType> = Vec::new();
+
         while !self.check_next(&[TokenType::Eof]) {
+            // While we have not reached the end of the sequence of tokens (EOF), parse the next statement.
             match self.statement() {
                 Ok(statement) => statements.push(statement),
                 Err(error) => {
+                    // If an error occurred during the parse, collect the error and synchronise.
                     errors.push(error);
                     self.sync();
                 },
@@ -35,15 +41,19 @@ impl Parser {
         }
         
         if errors.is_empty() {
+            // No error occurred, return the sequence of statements.
             Ok(statements)
         } else {
+            // Report all the errors and return an Err() so that the driver code knows that it cannot go on.
             error::report_errors(&errors[..]);
             Err(errors)
         }
     }
 
+    /// Synchronises the parser to the next possible start of a new statement.
     fn sync(&mut self) {
         while !self.check_next(&[
+            // These are considered tokens that are 'safe' to synchronise to.
             TokenType::Eof,
             TokenType::For,
             TokenType::Func,
@@ -53,12 +63,15 @@ impl Parser {
             TokenType::Var,
             TokenType::While,
         ]) {
-            self.current_index += 1;
-            self.current_line = self.tokens[self.current_index].line;
+            self.current_index += 1;  // Increment `current_index` until a 'safe' token is found.
+            self.current_line = self.tokens[self.current_index].line;  // Update the line number as we iterate.
         }
     }
     
+    /// Parses a statement.
+    /// <statement> ::= Break | For <for> | Func <function> | If <if> | Print <print> | Return <return> | Var <var> | While <while> | <expression>
     fn statement(&mut self) -> Result<Stmt, ErrorType> {
+        // If the next token is one of these, consume it and call the relevant function, which will parse the rest of the statement.
         if self.check_and_consume(&[TokenType::Break]).is_some() {
             Ok(Stmt {
                 line: self.current_line,
@@ -81,62 +94,86 @@ impl Parser {
         } else {
             Ok(Stmt {
                 line: self.current_line,
-                stmt_type: StmtType::Expression { expression: self.expression()? }
+                stmt_type: StmtType::Expression {
+                    expression: self.expression()?
+                }
             })
         }
     }
 
+    /// <block> ::= LeftCurly <statement>* RightCurly
     fn block(&mut self) -> Result<Stmt, ErrorType> {
-        // Note this can only be called directly in e.g. `if`s and `func`s, i.e. source code cannot just have `{`s all over the place.
+        // Consume LeftCurly if it follows; otherwise, raise an error.
         self.expect(TokenType::LeftCurly, '{')?;
         
+        // Parse <statement>*.
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.check_next(&[TokenType::RightCurly, TokenType::Eof]) {
+            // Keep parsing statements until the next token is a RightCurly or we have reached the end of the sequence of tokens.
             statements.push(self.statement()?);
         }
 
+        // Consume RightCurly.
         self.expect(TokenType::RightCurly, '}')?;
         Ok(Stmt {
             line: self.current_line,
-            stmt_type: StmtType::Block { body: statements }
+            stmt_type: StmtType::Block {
+                body: statements
+            }
         })
     }
 
+    /// <for> ::= LeftParen <statement>? Semicolon <expression>? Semicolon <statement>? RightParen <block>
     fn for_(&mut self) -> Result<Stmt, ErrorType> {
+        // Consume LeftParen.
         self.expect(TokenType::LeftParen, '(')?;
 
-        // The initialising statement can only either be a variable assignment or declaration.
+        // Parse <statement>? as the initialising statement of the `for` loop. As it is optional, an Option<Stmt> is used.
         let mut initialiser: Option<Stmt> = None;
         if !self.check_next(&[TokenType::Semicolon]) {
-            // The next token isn't a semicolon, so we've got an invalid initialising statement here.
+            // If the next token is not a semicolon, we parse it as the <statement>.
             initialiser = Some(self.statement()?);
         }
 
+        // Consume Semicolon if it follows.
         if self.check_and_consume(&[TokenType::Semicolon]).is_none() {
+            // If there is no Semicolon, raise a specific error to avoid confusion as there are many semicolons in a `for` loop.
             return Err(ErrorType::ExpectedSemicolonAfterInit { line: self.current_line });
         }
 
-        let mut condition = Expr { line: self.current_line, expr_type: ExprType::Literal { value: Literal::Bool(true) }};  // If there is no given condition, always `true`.
+        // Parse <expression>? as the condition of the `for` loop. Again, an Option<Expr> is used as it is optional.
+        let mut condition = Expr {
+            line: self.current_line,
+            expr_type: ExprType::Literal {
+                value: Literal::Bool(true)  // If no condition is given, it will be `true` by default.
+            }
+        };
         if !self.check_next(&[TokenType::Semicolon]) {
+            // If the next token is not a Semicolon, we parse it as the <expression>.
             condition = self.expression()?;
         }
 
+        // Consume Semicolon if it follows.
         if self.check_and_consume(&[TokenType::Semicolon]).is_none() {
+            // If there is no Semicolon, again raise a specific error.
             return Err(ErrorType::ExpectedSemicolonAfterCondition { line: self.current_line });
         }
 
+        // Parse <statement>? as the incrementing statement of the `for` loop.
         let mut increment: Option<Stmt> = None;
         if !self.check_next(&[TokenType::RightParen]) {
             increment = Some(self.statement()?);
         }
 
+        // Consume RightParen if it is given; otherwise, raise a specific error.
         if self.check_and_consume(&[TokenType::RightParen]).is_none() {
             return Err(ErrorType::ExpectedParenAfterIncrement { line: self.current_line });
         }
 
+        // Parse <block>, i.e., the body of the `for` loop including the curly brackets.
         let for_body = self.block()?;
 
-        // Now we convert it to:
+        // Now, we internally convert the `for` loop into a `while` loop:
         //  {
         //      `initialiser`
         //      while (`condition`) {
@@ -147,16 +184,22 @@ impl Parser {
         //      }
         //  }
 
+        // The body of the `while` loop includes the `for` loop body.
         let mut while_body_vec = vec![for_body];
         if let Some(inc) = increment {
+            // If there is an increment, put it at the end of the `while` loop body.
             while_body_vec.push(inc);
         }
 
+        // Create the `Block` statement for the `while` loop.
         let while_body = Stmt {
             line: self.current_line,
-            stmt_type: StmtType::Block { body: while_body_vec }
+            stmt_type: StmtType::Block {
+                body: while_body_vec
+            }
         };
 
+        // The `while` loop has the same condition as the `for` loop.
         let while_loop = Stmt {
             line: self.current_line,
             stmt_type: StmtType::While {
@@ -164,62 +207,85 @@ impl Parser {
                 body: Box::new(while_body)
             }
         };
-        // TODO: Good place for a flow chart!
+        
         if let Some(init) = initialiser {
+            // If an initialising statement is given, place it before the `while` loop and wrap in a `Block` statement.
             Ok(Stmt {
                 line: self.current_line,
                 stmt_type: StmtType::Block { body: vec![init, while_loop] }
             })
         } else {
+            // Otherwise, just return the `while` loop.
             Ok(while_loop)
         }
     }
 
+    /// <function> ::= Identifier LeftParen (Identifier (Comma Identifier)*)? RightParen <block>
     fn function(&mut self) -> Result<Stmt, ErrorType> {
-        if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
+        if let Some(function_name_token) = self.check_and_consume(&[TokenType::Identifier]) {
+            // If an Identifier was given (the name of the function), consume it.
+
+            // Consume LeftParen.
             self.expect(TokenType::LeftParen, '(')?;
 
+            // Parse (Identifier (Comma Identifier)*)?, i.e., collect an array of strings for the parameters.
             let mut parameters: Vec<String> = Vec::new();
             if !self.check_next(&[TokenType::RightParen]) {
-                // If there are parameters, i.e. not just ().
-                loop {
+                // If there are parameters, i.e., not just ().
+                loop {  // Keep looping until there is no Comma following a parameter.
                     if let Some(parameter) = self.check_and_consume(&[TokenType::Identifier]) {
+                        // If an Identifier was given (the name of the parameter), consume it and push it to the array of parameters.
                         parameters.push(parameter.lexeme);
                     } else {
+                        // Otherwise, raise a specific error, as a parameter must be given after a comma.
                         return Err(ErrorType::ExpectedParameterName { line: self.current_line });
                     }
+
+                    // If a Comma does not follow a parameter, then there should be no more parameters.
+                    // Otherwise, if a Comma was found, consume it.
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
                         break;
                     }
                 }
             }
 
+            // Consume RightParen.
             self.expect(TokenType::RightParen, ')')?;
 
+            // Parse <block>, the body of the function.
             let body = self.block()?;
 
             Ok(Stmt {
                 line: self.current_line,
                 stmt_type: StmtType::Function {
-                name: identifier.lexeme,
-                parameters,
-                body: Box::new(body),
+                    name: function_name_token.lexeme,
+                    parameters,
+                    body: Box::new(body),
                 }
             })
         } else {
+            // Otherwise, raise a specific error.
             Err(ErrorType::ExpectedFunctionName { line: self.current_line })
         }
     }
 
+    /// <if> ::= LeftParen <expression> RightParen <block> (Else <else>)?
     fn if_(&mut self) -> Result<Stmt, ErrorType> {
+        // Consume LeftParen.
         self.expect(TokenType::LeftParen, '(')?;
+
+        // Parse <expression>, the condition of the `if` statement.
         let condition = self.expression()?;
+
+        // Consume RightParen.
         self.expect(TokenType::RightParen, ')')?;
 
+        // Parse <block>, the `then` body of the `if` statement.
         let then_body = self.block()?;
         
         if self.check_and_consume(&[TokenType::Else]).is_some() {
-            let else_body = self.else_body()?;
+            // If there is an Else token after the `then` body, consume the Else, then parse <else>.
+            let else_body = self.else_()?;
             Ok(Stmt {
                 line: self.current_line,
                 stmt_type: StmtType::If {
@@ -229,6 +295,7 @@ impl Parser {
                 }
             })
         } else {
+            // Otherwise, just return the `if` statement with just the `then` body.
             Ok(Stmt {
                 line: self.current_line,
                 stmt_type: StmtType::If {
@@ -240,61 +307,73 @@ impl Parser {
         }
     }
 
-    fn else_body(&mut self) -> Result<Stmt, ErrorType> {
-        // After an `else`, there can either be another block or an `if` to make an `else if`.
+    /// <else> ::= If <if> | <block>
+    fn else_(&mut self) -> Result<Stmt, ErrorType> {
+        // After an `else`, there can either be another block, which ends the `if` statement, or an `if` to make an `else if`.
         if self.check_and_consume(&[TokenType::If]).is_some() {
-            // else if
+            // If there is an If token, consume it, then parse <if> to create an `else if`.
             Ok(self.if_()?)
         } else {
-            // else
+            // Otherwise, just parse the `else` block.
             Ok(self.block()?)
         }
     }
 
+    /// <print> ::= <expression>
     fn print(&mut self) -> Result<Stmt, ErrorType> {
         Ok(Stmt {
             line: self.current_line,
-            stmt_type: StmtType::Print { expression: self.expression()? }
+            stmt_type: StmtType::Print {
+                expression: self.expression()?
+            }
         })
     }
 
+    /// <return> ::= <expression>
     fn return_(&mut self) -> Result<Stmt, ErrorType> {
-        match self.expression() {
-            Ok(expr) => Ok(Stmt {
-                line: self.current_line,
-                stmt_type: StmtType::Return { expression: Some(expr) }
-            }),
-            Err(ErrorType::ExpectedExpression {..}) => Ok(Stmt {
-                line: self.current_line,
-                stmt_type: StmtType::Return { expression: None }
-            }),
-            Err(e) => Err(e),
-        }
-        
+        Ok(Stmt {
+            line: self.current_line,
+            stmt_type: StmtType::Return {
+                expression: self.expression()?
+            }
+        })
     }
 
+    /// <var> ::= Identifier Equal <expression>
     fn var(&mut self) -> Result<Stmt, ErrorType> {
-        if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
+        if let Some(target_variable_token) = self.check_and_consume(&[TokenType::Identifier]) {
+            // If an Identifier was given (the target variable name), consume it.
+
+            // Consume Equal.
             self.expect(TokenType::Equal, '=')?;
             
+            // Parse <expression>.
             let value = self.expression()?;
             Ok(Stmt {
                 line: self.current_line,
                 stmt_type: StmtType::VarDecl {
-                    name: identifier.lexeme,
+                    name: target_variable_token.lexeme,
                     value,
                 }
             })
         } else {
+            // Otherwise, raise a specific error.
             Err(ErrorType::ExpectedVariableName { line: self.current_line })
         }
     }
 
+    /// <while> ::= LeftParen <expression> RightParen <block>
     fn while_(&mut self) -> Result<Stmt, ErrorType> {
+        // Consume LeftParen.
         self.expect(TokenType::LeftParen, '(')?;
+        
+        // Parse <expression>, the condition of the `while` loop.
         let condition = self.expression()?;
+
+        // Consume RightParen.
         self.expect(TokenType::RightParen, ')')?;
 
+        // Parse <block>, the body of the `while` loop.
         let body = self.block()?;
 
         Ok(Stmt {
@@ -306,59 +385,62 @@ impl Parser {
         })
     }
 
-    // expr -> assignment
+    /// Parses an expression.
+    /// <expression> ::= <assignment>
     fn expression(&mut self) -> Result<Expr, ErrorType> {
         self.assignment()
     }
 
-    // assignment -> or ("=" assignment)?
-    // `or ("=" or)*` is NOT correct because it will build from the left.
-    // E.g., `a = b = 5` -> `(a = b) = 5` which will cause problems in interpreter.
-    // Given that LHS is either `Variable` or `Element`.
+    /// <assignment> ::= <or> (Equal <assignment>)?
+    /// Note that it is done recursively instead of <assignment> ::= <or> (Equal <or>)* as it
+    /// is easier to enforce rightmost derivation with recursion on the right-hand side expression.
+    /// In other words, the parse tree should look like this `a = (b = (c = 3))` as opposed to
+    /// `((a = b) = c) = 3`
     fn assignment(&mut self) -> Result<Expr, ErrorType> {
+        // Parse <or>, i.e., any expression with higher precedence.
         let expr = self.or()?;
 
         if self.check_and_consume(&[TokenType::Equal]).is_some() {
+            // If an Equal was given, consume it.
+
+            // Recursively parse <assignment>.
             let value = self.assignment()?;
             
-            // ! This might not be necessary because this needs to be checked anyway at runtime.
-            // match expr {
-            //     Expr::Element {..} |
-            //     Expr::Variable {..} => {
-            //         Ok(Expr::Assignment {
-            //             target: Box::new(expr),
-            //             value: Box::new(value),
-            //         })
-            //     },
-            //     _ => {
-            //         Err(ErrorType::InvalidAssignmentTarget { line: self.current_line })
-            //     }
-            // }
             Ok(Expr {
                 line: self.current_line,
                 expr_type: ExprType::Assignment {
-                    target: Box::new(expr),
+                    target: Box::new(expr),  // Use the <or> as the `target` of the Assignment.
                     value: Box::new(value),
                 }
             })
         } else {
+            // Otherwise, just return the expression as is.
             Ok(expr)
         }
     }
 
-    // or -> and ("or" and)*
-    // This is equivalent to `or -> and "or" or` as order does not matter but avoids recursion in the implementation.
-    // TODO: The report should use `or -> and "or" or` because this is binary.
+    /// <or> ::= <and> (Or <and>)*
+    /// Note that here, iteration is used instead of recursion because we can iteratively
+    /// replace `expr` with another expression, using the previous `expr` as the left-hand side.
+    /// This enforces leftmost derivation and is the natural order of evaluation for binary operations,
+    /// which will become relevant when two operators have the same precedence and the order of evaluation
+    /// depends on the order they come in, e.g., <plus_minus>.
+    /// In other words, the parse tree should look like `((a or b) or c) or d`, as opposed to
+    /// `a or (b or (c or d))`. This also minimises recursion; hence, it is more memory efficient.
     fn or(&mut self) -> Result<Expr, ErrorType> {
+        // Parse <and>.
         let mut expr = self.and()?;
 
         while let Some(operator) = self.check_and_consume(&[TokenType::Or]) {
+            // While the following token is an Or, consume it and store the token object (Or) in `operator`.
+
+            // Parse <and>.
             let right = self.and()?;
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
-                    left: Box::new(expr),
-                    operator,
+                    left: Box::new(expr),  // Use the previous `expr` as the left-hand side to enforce leftmost derivation.
+                    operator,  // Store the token object (Or), as this will be used to determine the operation in runtime.
                     right: Box::new(right),
                 }
             };
@@ -366,7 +448,8 @@ impl Parser {
         Ok(expr)
     }
 
-    // and -> equality ("and" equality)*
+    /// <and> ::= <equality> (And <equality>)*
+    /// As above.
     fn and(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.equality()?;
 
@@ -384,12 +467,14 @@ impl Parser {
         Ok(expr)
     }
 
-    // equality -> comparison ( ("==" | "!=") comparison)*
+    /// <equality> ::= <comparison> ((EqualEqual | BangEqual) <comparison>)*
+    /// As above.
     fn equality(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.comparison()?;
 
-
         while let Some(operator) = self.check_and_consume(&[TokenType::EqualEqual, TokenType::BangEqual]) {
+            // This time, allow both EqualEqual and BangEqual tokens as they have equal precedence.
+            
             let right = self.comparison()?;
             expr = Expr {
                 line: self.current_line,
@@ -403,7 +488,8 @@ impl Parser {
         Ok(expr)
     }
 
-    // comparison -> plus_minus ( (">" | "<" | ">=" | "<=") plus_minus)*
+    /// <comparison> ::= <plus_minus> ((Greater | Less | GreaterEqual | LessEqual) <plus_minus>)*
+    /// As above.
     fn comparison(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.plus_minus()?;
 
@@ -421,7 +507,8 @@ impl Parser {
         Ok(expr)
     }
 
-    // plus_minus -> star_slash_percent ( ("+" | "-") star_slash_percent)*
+    /// <plus_minus> ::= <star_slash_percent> ((Plus | Minus) <star_slash_percent>)*
+    /// As above.
     fn plus_minus(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.star_slash_percent()?;
 
@@ -439,7 +526,8 @@ impl Parser {
         Ok(expr)
     }
 
-    // star_slash_percent -> unary ( ("*" | "/" | "%") unary)*
+    /// <star_slash_percent> ::= <unary> ((Star | Slash | Percent) <unary>)*
+    /// As above.
     fn star_slash_percent(&mut self) -> Result<Expr, ErrorType> {
         let mut expr = self.unary()?;
 
@@ -457,187 +545,251 @@ impl Parser {
         Ok(expr)
     }
 
-    // unary -> ("!" | "-") unary |
-    //          element
-    // This is best implemented recursively. As it is not left recursive, this is safe.
+    /// <unary> ::= (Bang | Minus) <unary> |
+    ///             <element>
     fn unary(&mut self) -> Result<Expr, ErrorType> {
         if let Some(operator) = self.check_and_consume(&[TokenType::Bang, TokenType::Minus]) {
+            // If the current token is either Bang or Minus, consume it.
+
+            // Recursively parse <unary>.
             let right = self.unary()?;
             Ok(Expr {
                 line: self.current_line,
                 expr_type: ExprType::Unary {
                     operator,
-                    right: Box::new(right),
+                    right: Box::new(right),  // Use the recursion as the right-hand side expression, i.e., !(!(!(!true)))
                 }
             })
         } else {
+            // Otherwise, assume it is of lower precedence and parse <element>.
             self.element()
         }
     }
 
-    // element -> call ("[" expr "]")*
+    /// <element> ::= <call> (LeftSquare <expression> RightSquare)*
     fn element(&mut self) -> Result<Expr, ErrorType> {
-        let mut expr = self.call()?;  // This is the array.
+        // Parse <call>, i.e., the 'array' part of an element (`a` in `a[2][3]`).
+        let mut expr = self.call()?;
         
         while self.check_and_consume(&[TokenType::LeftSquare]).is_some() {
-            // if let Some(index_token) = self.check_and_consume(&[TokenType::Number]) {
-            //     if let Literal::Number(float) = index_token.literal {
-            //         if float >= 0.0 && float.fract() == 0.0 {
-            //             expr = Expr { line: self.current_line, expr_type: ExprType::Element { array: Box::new(expr), index: float as usize }};
-            //         } else {
-            //             return Err(ErrorType::InvalidIndex { line: self.current_line });
-            //         }
-            //     } else {
-            //         return Err(ErrorType::InvalidIndex { line: self.current_line });
-            //     }
-            // } else {
-            //     return Err(ErrorType::InvalidIndex { line: self.current_line });
-            // }
+            // While the following token is LeftSquare, consume it.
+
+            // Parse <expression>, i.e., the 'index' part of an element (`1+2` in `a[1+2]`).
             let index = self.expression()?;
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Element {
-                    array: Box::new(expr),
+                    array: Box::new(expr),  // Use the previous `expr` as the 'array' part to keep leftmost derivation.
                     index: Box::new(index),
                 }
             };
+
+            // Consume the closing RightSquare of an index.
             self.expect(TokenType::RightSquare, ']')?;
         }
-        
         Ok(expr)
     }
     
-    // call -> primary ("(" (expr ("," expr)*)? ")")*
-    // TODO: is `a+b(c+d)` a problem?
+    /// <call> ::= <primary> (LeftParen (<expression> (Comma <expression>)*)? RightParen)*
     fn call(&mut self) -> Result<Expr, ErrorType> {
-        let mut expr = self.primary()?;  // This is the callee.
+        // Parse <primary>, i.e., the callee (`f` in `f(2)(3)`).
+        let mut expr = self.primary()?;
 
         while self.check_and_consume(&[TokenType::LeftParen]).is_some() {
+            // While the following token is LeftParen, consume it.
+
+            // Collect the arguments of the function call into an array.
             let mut arguments: Vec<Expr> = Vec::new();
-            // TODO: infinite loop?
+            
             if !self.check_next(&[TokenType::RightParen]) {
-                // If there are arguments, i.e. not just f().
+                // If there are arguments, i.e., not just f().
                 loop {
+                    // Keep parsing the argument expressions and pushing them to the array of arguments...
                     arguments.push(self.expression()?);
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
+                        // until the next token is not a Comma, in which case, there are no more arguments.
                         break;
                     }
                 }
             }
 
+            // Consume the closing RightParen.
             self.expect(TokenType::RightParen, ')')?;
 
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Call {
-                    callee: Box::new(expr),
+                    callee: Box::new(expr),  // Use the previous `expr` as the 'callee' part to keep the leftmost derivation.
                     arguments,
                 }
             }
         }
-
         Ok(expr)
     }
 
-    // primary -> literals |
-    //            "(" expr ")" |
-	//            "[" (expr ("," expr)*)? "]" |
-    //            "{" (expr ":" expr ("," expr ":" expr)*)? "}" |
-	//            identifier
+
+    /// <primary> ::= Literal |
+    ///             LeftParen <expression> RightParen |
+	///             LeftSquare (<expression> (Comma <expression>)*)? RightSquare |
+    ///             LeftCurly (<expression> Colon <expression> (Comma <expression> Colon <expression>)*)? RightCurly |
+	///             Identifier
     fn primary(&mut self) -> Result<Expr, ErrorType> {
-        if let Some(token) = self.check_and_consume(&[TokenType::String_, TokenType::Number, TokenType::True, TokenType::False, TokenType::Null]) {
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Literal { value: token.literal }})
+        if let Some(token) = self.check_and_consume(&[
+            TokenType::String_,
+            TokenType::Number,
+            TokenType::True,
+            TokenType::False,
+            TokenType::Null
+        ]) {
+            // Literal.
+            // If the token is a String_, Number, True, False, or Null, use its literal value,
+            // which is stored as an attribute in the Token object.
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Literal {
+                    value: token.literal
+                }
+            })
 
         } else if self.check_and_consume(&[TokenType::LeftParen]).is_some() {
             // Grouping.
+
+            // Parse <expression>.
             let expr = self.expression()?;
+
+            // Consume the closing RightParen.
             self.expect(TokenType::RightParen, ')')?;
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Grouping { expression: Box::new(expr) }})
+
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Grouping {
+                    expression: Box::new(expr)
+                }
+            })
 
         } else if self.check_and_consume(&[TokenType::LeftSquare]).is_some() {
             // Array.
+
+            // Collect the expressions of the array elements into an array.
             let mut elements: Vec<Expr> = Vec::new();
             
-            // TODO: infinite loop?
             if !self.check_next(&[TokenType::RightSquare]) {
-                // If there are elements, i.e. not just [].
+                // If there are elements, i.e., not just [].
                 loop {
+                    // Keep parsing the element expressions and pushing them to the array of elements...
                     elements.push(self.expression()?);
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
+                        // until the next token is not a Comma, in which case,
+                        // we assume there are no more elements in the array.
                         break;
                     }
                 }
             }
-
+            
+            // Consume the closing RightSquare.
             self.expect(TokenType::RightSquare, ']')?;
             Ok(Expr { line: self.current_line, expr_type: ExprType::Array { elements }})
 
         } else if self.check_and_consume(&[TokenType::LeftCurly]).is_some() {
-            // Dictionary
+            // Dictionary.
+
+            // Collect the expressions for the key-value pairs of the dictionary into an array.
             let mut elements: Vec<KeyValue<Expr>> = Vec::new();
 
-            // TODO: infinite loop?
             if !self.check_next(&[TokenType::RightCurly]) {
-                // If there are elements, i.e. not just {}.
+                // If there are elements, i.e., not just {}.
                 loop {
+                    // Keep parsing the key-value expressions and pushing them to the array of entries.
+
+                    // Parse the key expression.
                     let key = self.expression()?;
+
+                    // Consume Colon if it follows the key.
                     if self.check_and_consume(&[TokenType::Colon]).is_none() {
+                        // Otherwise, raise a specific error.
                         return Err(ErrorType::ExpectedColonAfterKey { line: self.current_line });
                     }
+
+                    // Parse the value expression.
                     let value = self.expression()?;
+
+                    // Push them to the array of entries.
                     elements.push(KeyValue { key, value });
 
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
+                        // Loop until the next token is not a Comma, in which case,
+                        // we assume there are no more entries in the dictionary.
                         break;
                     }
                 }
             }
 
+            // Consume the closing RightCurly.
             self.expect(TokenType::RightCurly, '}')?;
             Ok(Expr { line: self.current_line, expr_type: ExprType::Dictionary { elements } })
 
         } else if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
             // Variable.
+            // If the token is an Identifier, use its stored lexeme which will be the variable name.
+            // Note 'variable' in this case also means function names.
             Ok(Expr { line: self.current_line, expr_type: ExprType::Variable { name: identifier.lexeme }})
 
         } else {
-            // TODO: This should probably say which character it found as well. E.g., input '{'
+            // If no rule matches the token, then we expected an expression but was not given one.
+            // So, raise an ExpectedExpression error.
             Err(ErrorType::ExpectedExpression { line: self.current_line })
         }
     }
 
-    /// Returns `Some(Token)` and advances if next token's type is one of the `expected_types`. Otherwise, or if at end of file, return `None`.
+    /// Returns `Some(token)` and advances the pointer if the type of the next token is one of the `expected_types`.
+    /// Otherwise, or if we are at the end of the sequence of tokens, return `None`.
     fn check_and_consume(&mut self, expected_types: &[TokenType]) -> Option<Token> {
         if let Some(token) = self.tokens.get(self.current_index) {
+            // If we are not at the end of the sequence of tokens...
             if expected_types.contains(&token.type_) {
+                // If the type of the next token is one of the `expected_types`,
+                // increment `current_index` and update `current_line`.
                 self.current_index += 1;
                 self.current_line = token.line;
                 Some(token).cloned()
             } else {
+                // If it the token does not match, then return `None`.
                 None
             }
         } else {
+            // If we are at the end, return `None`.
             None
         }
     }
 
-    /// Returns `true` if the next token's type is one of the `expected_types`. Otherwise, or if at end of file, return `false`.
+    /// Returns `true` if the type of the next token is one of the `expected_types`.
+    /// Otherwise, or if we are at the end of the sequence of tokens, return `false`.
+    /// The difference between this and `check_and_consume()` is that this does not advance the pointer if
+    /// the token matches what is expected.
     fn check_next(&self, expected_types: &[TokenType]) -> bool {
         if let Some(token) = self.tokens.get(self.current_index) {
+            // If we are not at the end of the sequence of tokens, return whether or not
+            // the token's type is one of the `expected_types`.
             expected_types.contains(&token.type_)
         } else {
+            // If we are at the end, return `None`.
             false
         }
     }
 
+    /// Returns `Ok(())` and advances the pointer if the type of the next token is one of the `expected_types`.
+    /// Otherwise, return `Err(ErrorType::ExpectedCharacter)`.
+    /// The difference between this and `check_and_consume()` is that this does not return the token itself,
+    /// just an error to be bubbled up.
     fn expect(&mut self, expected_type: TokenType, expected_char: char) -> Result<(), ErrorType> {
         if self.check_and_consume(&[expected_type]).is_none() {
+            // If `check_and_consume()` returned `None`, i.e., the token does not match or we are at the end of
+            // the sequence of tokens, return an `ExpectedCharacter` error.
             return Err(ErrorType::ExpectedCharacter {
                 expected: expected_char,
                 line: self.current_line,
             });
         }
-
         Ok(())
     }
 }

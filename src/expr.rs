@@ -1,11 +1,13 @@
 use crate::{token, hash_table::KeyValue};
 
+/// An expression.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
     pub line: usize,
     pub expr_type: ExprType,
 }
 
+/// Possible types of expressions.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprType {
     Array {
@@ -26,15 +28,14 @@ pub enum ExprType {
         right: Box<Expr>,
     },
     Call {
-        callee: Box<Expr>,  // `Expr` so that f()() works
+        callee: Box<Expr>,
         arguments: Vec<Expr>,
     },
     Dictionary {
         elements: Vec<KeyValue<Expr>>,
     },
-    Element {  // ? Maybe this should be combined with `Variable`...
-        // ! This should probably NOT be combined with `Variable` because e.g., [1,2,3][0] has to evaluate [1,2,3] first.
-        array: Box<Expr>,  // Should resolve to `Array` or `Variable`.
+    Element {
+        array: Box<Expr>,
         index: Box<Expr>,
     },
     Grouping {
@@ -44,10 +45,10 @@ pub enum ExprType {
         value: token::Literal,
     },
     Unary {
-        operator: token::Token,  // Either `!` or `-`.
+        operator: token::Token,
         right: Box<Expr>,
     },
     Variable {
-        name: String,  // More specifically, `Token` with `Identifier` type. Let's try String. Formerly Token.
+        name: String,
     },
 }

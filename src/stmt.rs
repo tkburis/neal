@@ -1,11 +1,13 @@
 use crate::expr::Expr;
 
+/// A statement.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stmt {
     pub line: usize,
     pub stmt_type: StmtType,
 }
 
+/// Possible types of statements.
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtType {
     Block {
@@ -29,7 +31,7 @@ pub enum StmtType {
         expression: Expr,
     },
     Return {
-        expression: Option<Expr>,
+        expression: Expr,
     },
     VarDecl {
         name: String,

@@ -19,6 +19,7 @@ pub enum Value {
 }
 
 impl Value {
+    /// Returns the string of the `Value`'s type for error reports.
     pub fn type_to_string(&self) -> String {
         match self {
             Self::Number(..) => String::from("Number"),
@@ -32,6 +33,7 @@ impl Value {
     }
 }
 
+/// Used when printing `Value`s.
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -69,6 +71,7 @@ impl fmt::Display for Value {
     }
 }
 
+/// Built-in functions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BuiltinFunction {
     Append,

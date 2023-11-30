@@ -1,5 +1,6 @@
 use crate::value::Value;
 
+/// Possible errors that may occur during execution.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ErrorType {
     // Tokenizing errors.
@@ -47,12 +48,10 @@ pub enum ErrorType {
         name: String,
         line: usize,
     },
-    NotIndexableError {  // TODO: Maybe no need for `name`.
-        name: Option<String>,
+    NotIndexableError {
         line: usize,
     },
     OutOfBoundsIndexError {
-        name: Option<String>,
         index: usize,
         line: usize,
     },
@@ -86,7 +85,7 @@ pub enum ErrorType {
     IfConditionNotBoolean {
         line: usize,
     },
-    WhileConditionNotBoolean {
+    LoopConditionNotBoolean {
         line: usize,
     },
     CannotCallName {
@@ -125,6 +124,7 @@ pub enum ErrorType {
     },
 }
 
+/// Prints the error message for each error in `errors`.
 pub fn report_errors(errors: &[ErrorType]) {
     println!("An error has occurred.");
     for error in errors {
@@ -132,6 +132,7 @@ pub fn report_errors(errors: &[ErrorType]) {
     }
 }
 
+/// Prints the error message for an error.
 fn print_report(error: &ErrorType) {
     match error {
         ErrorType::UnexpectedCharacter { character, line } => {
@@ -173,19 +174,11 @@ fn print_report(error: &ErrorType) {
         ErrorType::NameError { ref name, line } => {
             println!("Line {0}: `{1}` is not defined.", line, name);
         },
-        ErrorType::NotIndexableError { name, line } => {
-            if let Some(n) = name {
-                println!("Line {0}: `{1}` is not indexable.", line, n);
-            } else {
-                println!("Line {}: the value is not indexable.", line);
-            }
+        ErrorType::NotIndexableError { line } => {
+            println!("Line {}: the value is not indexable.", line);
         },
-        ErrorType::OutOfBoundsIndexError { name, index, line } => {
-            if let Some(n) = name {
-                println!("Line {0}: index `{1}` is out of bounds for `{2}`.", line, index, n);
-            } else {
-                println!("Line {0}: index `{1}` is out of bounds.", line, index)
-            }
+        ErrorType::OutOfBoundsIndexError { index, line } => {
+            println!("Line {0}: index `{1}` is out of bounds.", line, index);
         },
         ErrorType::InsertNonStringIntoStringError { line } => {
             println!("Line {}: attempted to insert a non-String into a String.", line);
@@ -208,8 +201,8 @@ fn print_report(error: &ErrorType) {
         ErrorType::IfConditionNotBoolean { line } => {
             println!("Line {}: the `if` condition does not evaluate to a Boolean value.", line);
         },
-        ErrorType::WhileConditionNotBoolean { line } => {
-            println!("Line {}: the condition of the `while` loop does not evaluate to a Boolean value.", line);
+        ErrorType::LoopConditionNotBoolean { line } => {
+            println!("Line {}: the condition of the loop does not evaluate to a Boolean value.", line);
         },
         ErrorType::CannotCallName { line } => {
             println!("Line {}: cannot call name as a function.", line);

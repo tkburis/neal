@@ -1,5 +1,6 @@
 use crate::{token::{Token, TokenType, Literal}, error::{self, ErrorType}};
 
+/// The states of the DFA.
 #[derive(Debug)]
 enum State {
     Start,
@@ -36,6 +37,7 @@ enum State {
     NoOp,
 }
 
+/// Performs lexical analysis.
 pub struct Tokenizer<'a> {
     source: &'a str,  // Source code.
     tokens: Vec<Token>,  // Tokens that have been tokenized from source code.
@@ -46,6 +48,7 @@ pub struct Tokenizer<'a> {
 }
 
 impl<'a> Tokenizer<'a> {
+    /// Initialise a new instance of `Tokenizer`, given the string source code.
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
@@ -57,23 +60,26 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    /// Interface function.
-    /// Returns a vector of tokens if no error had taken place. Otherwise, returns `Err(())`.
+    /// Returns the sequence of tokens from the source code.
     pub fn tokenize(&mut self) -> Result<Vec<Token>, ErrorType> {
         while self.source.chars().nth(self.current_index).is_some() {
+            // If current_index has not reached the end of the source code, scan the next token.
             match self.scan_token() {
                 Ok(token_opt) => {
+                    // It is possible that `scan_token()` returns Ok(None) if the DFA lands on the NoOp state.
                     if let Some(token) = token_opt {
                         self.tokens.push(token);
                     }
                 },
                 Err(error) => {
+                    // If an error has occurred during the `scan_token()` call, report the error and terminate execution.
                     error::report_errors(&[error.clone()]);
-                    return Err(error);
+                    return Err(error);  // Return Err() so that the driver code knows to end execution.
                 }
             }
         }
 
+        // Push an EOF token to end the token sequence.
         self.tokens.push(Token {
             type_: TokenType::Eof,
             lexeme: String::from(""),
@@ -84,11 +90,15 @@ impl<'a> Tokenizer<'a> {
         Ok(self.tokens.clone())
     }
 
+    /// Scans the token starting from `current_index`.
     fn scan_token(&mut self) -> Result<Option<Token>, ErrorType> {
         self.current_state = State::Start;
         
         loop {
+            // It is possible that the tokenizer reaches the end of the source code before `scan_token()` returns.
+            // So we account for `current_char_opt` being None in all possible current states.
             let current_char_opt = self.source.chars().nth(self.current_index);
+
             match self.current_state {
                 State::Start => {
                     self.start = self.current_index;  // The next token starts here.
@@ -110,7 +120,7 @@ impl<'a> Tokenizer<'a> {
                             '/' => self.current_state = State::GotSlash,
                             '*' => self.current_state = State::GotStar,
                             
-                            // We have to see the next character to be able to correctly identify the token.
+                            // For these tokens, we have to see the next character to be able to correctly identify the token.
                             '!' => self.current_state = State::GotBang,
                             '=' => self.current_state = State::GotEqual,
                             '>' => self.current_state = State::GotGreater,
@@ -125,7 +135,7 @@ impl<'a> Tokenizer<'a> {
                             // Identifiers and keywords.
                             'a'..='z' | 'A'..='Z' | '_' => self.current_state = State::InWord,
     
-                            // Comments
+                            // Comments.
                             '#' => self.current_state = State::InComment,
 
                             // Whitespace.
@@ -137,7 +147,7 @@ impl<'a> Tokenizer<'a> {
                             },
     
                             other => {
-                                // If the character does not match any of the above rules, raise an error.
+                                // If the character does not match any of the above rules, raise an UnexpectedCharacter error.
                                 return Err(ErrorType::UnexpectedCharacter {
                                     character: other,
                                     line: self.current_line,
@@ -145,6 +155,8 @@ impl<'a> Tokenizer<'a> {
                             },
                         }
                     } else {
+                        // Note that this should be unreachable; the Start state is only ever accessed at the first iteration of the loop,
+                        // and we have already checked we are not at the end in `tokenize()`.
                         return Ok(None);
                     }
                 },
@@ -169,7 +181,7 @@ impl<'a> Tokenizer<'a> {
                     if current_char_opt == Some('=') {
                         self.current_state = State::GotBangEqual;
                     } else {
-                        // If the character isn't `=` or we are at the end, just make `Bang` token.
+                        // If the character isn't `=` or we are at the end, just make a `Bang` token.
                         return Ok(Some(self.construct_token(TokenType::Bang)));
                     }
                 },
@@ -230,6 +242,7 @@ impl<'a> Tokenizer<'a> {
                             if current_char == '.' {
                                 self.current_state = State::InNumberAfterDot;
                             } else if !current_char.is_ascii_digit() {
+                                // If it is not '0'-'9' (or a '.'), we have reached the end of the number.
                                 return Ok(Some(self.construct_token_with_literal(
                                     TokenType::Number,
                                     Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
@@ -238,6 +251,7 @@ impl<'a> Tokenizer<'a> {
                             // If it is a digit, we stay in this state and keep consuming digits.
                         },
                         None => {
+                            // If we have reached the end of the source code, then we can return with the number we constructed so far.
                             return Ok(Some(self.construct_token_with_literal(
                                 TokenType::Number,
                                 Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
@@ -246,9 +260,11 @@ impl<'a> Tokenizer<'a> {
                     }
                 },
                 State::InNumberAfterDot => {
+                    // Similar to above, but do not allow for '.' as we already have one in the number.
                     match current_char_opt {
                         Some(current_char) => {
                             if !current_char.is_ascii_digit() {
+                                // We have reached the end of the number.
                                 return Ok(Some(self.construct_token_with_literal(
                                     TokenType::Number,
                                     Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
@@ -267,7 +283,9 @@ impl<'a> Tokenizer<'a> {
 
                 State::InWord => {
                     if current_char_opt.map_or(true, |current_char| !(current_char.is_ascii_alphanumeric() || current_char == '_')) {
-                        // Construct the token if we are at the end of the file OR if current character is NOT alphanumeric or an `_`.
+                        // Construct the token if:
+                        // we are at the end of the source code, or
+                        // if the current character is not alphanumeric or an `_`.
                         let lexeme = &self.source[self.start..self.current_index];
                         return Ok(Some(match lexeme {
                             "and" => self.construct_token(TokenType::And),
@@ -302,16 +320,17 @@ impl<'a> Tokenizer<'a> {
                 State::NoOp => return Ok(None)
             }
 
+            // Increment the pointer to the next character.
             self.current_index += 1;
         }
     }
 
-    /// Adds a token that does not represent a literal value.
+    /// Helper function that adds a token without a literal value.
     fn construct_token(&mut self, token_type: TokenType) -> Token {
         self.construct_token_with_literal(token_type, Literal::Null)
     }
 
-    /// Adds an entire token.
+    /// Helper function that adds a token with a literal value.
     fn construct_token_with_literal(&mut self, token_type: TokenType, literal: Literal) -> Token {
         Token {
             type_: token_type,
