@@ -178,21 +178,8 @@ impl Interpreter {
                         match (&left_eval, &right_eval) {
                             (Value::Bool(left_bool), Value::Bool(right_bool)) => {
                                 match operator.type_ {
-                                    // ! Update report
-                                    TokenType::Or =>  {
-                                        if *left_bool {
-                                            Ok(Value::Bool(true))
-                                        } else {
-                                            Ok(Value::Bool(*right_bool))
-                                        }
-                                    },
-                                    TokenType::And => {
-                                        if !*right_bool {
-                                            Ok(Value::Bool(false))
-                                        } else {
-                                            Ok(Value::Bool(*right_bool))
-                                        }
-                                    },
+                                    TokenType::Or => Ok(Value::Bool(*left_bool || *right_bool)),
+                                    TokenType::And => Ok(Value::Bool(*left_bool && *right_bool)),
                                     _ => unreachable!(),
                                 }
                             },
