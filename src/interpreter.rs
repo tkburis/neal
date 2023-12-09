@@ -299,14 +299,17 @@ impl Interpreter {
                         // Create a new variable scope.
                         self.environment.new_scope();
 
-                        // Iterate through the arguments/parameters.
+                        // Iterate through the arguments/parameters and evaluate them first.
+                        let mut args_eval = Vec::new();
                         for i in 0..arguments.len() {
-                            // Evaluate the respective argument.
-                            let arg_eval = self.evaluate(&arguments[i])?;
-                            // Declare the argument in the function's scope with the parameter's name.
-                            self.environment.declare(parameters[i].clone(), &arg_eval);
+                            args_eval.push(self.evaluate(&arguments[i])?);
                         }
-        
+
+                        // Decalre the variables in the new call scope.
+                        for i in 0..arguments.len() {
+                            self.environment.declare(parameters[i].clone(), &args_eval[i]);
+                        }
+                        
                         // Execute the function body.
                         let exec_result = self.execute(&body);
 
