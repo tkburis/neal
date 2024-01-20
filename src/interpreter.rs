@@ -39,7 +39,7 @@ impl Interpreter {
                     // ! Update report
                     if let Err(e) = self.execute(block_stmt) {
                         self.environment.exit_scope();
-                        return Err(e)
+                        return Err(e);
                     }
                 }
                 
@@ -120,7 +120,7 @@ impl Interpreter {
                         // If `condition` evaluated to a Boolean value, set `continue_` to the result of that.
                         Value::Bool(condition_bool) => condition_bool,
                         // Otherwise, it cannot be used as the condition for a loop.
-                        _ => return Err(ErrorType::LoopConditionNotBoolean { line: stmt.line })
+                        _ => return Err(ErrorType::LoopConditionNotBoolean { line: stmt.line }),
                     };
 
                     // If the `condition` evaluated to `false`, stop the loop.
@@ -293,7 +293,7 @@ impl Interpreter {
                         if arguments.len() != parameters.len() {
                             // If the number of arguments given does not match the number of parameters expected,
                             // raise a detailed error.
-                            return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: parameters.len(), line: expr.line })
+                            return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: parameters.len(), line: expr.line });
                         }
                         
                         // Create a new variable scope.
@@ -332,7 +332,7 @@ impl Interpreter {
                                 // We want two arguments: the target array, and the value to append.
                                 if arguments.len() != 2 {
                                     // If the number of given arguments was not 2, raise an error, providing the number of arguments received.
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line })
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line });
                                 }
 
                                 let target = &arguments[0];
@@ -356,7 +356,7 @@ impl Interpreter {
                             BuiltinFunction::Input => {
                                 // We want one argument: the input prompt.
                                 if arguments.len() != 1 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
 
                                 // Print the input prompt.
@@ -375,7 +375,7 @@ impl Interpreter {
                             BuiltinFunction::Remove => {
                                 // We want two arguments: the target array/dictionary, and the index/key to remove.
                                 if arguments.len() != 2 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line })
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 2, line: expr.line });
                                 }
 
                                 let target = &arguments[0];
@@ -423,7 +423,7 @@ impl Interpreter {
                             BuiltinFunction::Size => {
                                 // We want one argument: the target array/dictionary/string.
                                 if arguments.len() != 1 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
 
                                 let value = self.evaluate(&arguments[0])?;
@@ -514,7 +514,7 @@ impl Interpreter {
                             BuiltinFunction::ToNumber => {
                                 // We want one argument: the Boolean value/number/string to be converted.
                                 if arguments.len() != 1 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })  // todo: semicolons after returns
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
 
                                 let value = self.evaluate(&arguments[0])?;
@@ -539,7 +539,7 @@ impl Interpreter {
                             BuiltinFunction::ToString => {
                                 // We want one argument: the Boolean value/number/string to be converted.
                                 if arguments.len() != 1 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
 
                                 let value = self.evaluate(&arguments[0])?;

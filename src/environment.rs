@@ -93,7 +93,7 @@ impl Environment {
                                     current_element = el;
                                 } else {
                                     // If the index provided is out-of-bounds, raise an `OutOfBoundsIndexError`.
-                                    return Err(ErrorType::OutOfBoundsIndexError { index: idx, line })
+                                    return Err(ErrorType::OutOfBoundsIndexError { index: idx, line });
                                 }
                             },
                             Value::Dictionary(dict) => {
@@ -119,7 +119,7 @@ impl Environment {
                                 current_element = el;
                             } else {
                                 // If the index provided is out-of-bounds or similar...
-                                return Err(ErrorType::OutOfBoundsIndexError { index: idx, line })
+                                return Err(ErrorType::OutOfBoundsIndexError { index: idx, line });
                             }
                             *current_element = value.clone();
                         },

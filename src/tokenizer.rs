@@ -255,7 +255,7 @@ impl<'a> Tokenizer<'a> {
                             return Ok(Some(self.construct_token_with_literal(
                                 TokenType::Number,
                                 Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
-                            )))
+                            )));
                         }
                     }
                 },
@@ -276,7 +276,7 @@ impl<'a> Tokenizer<'a> {
                             return Ok(Some(self.construct_token_with_literal(
                                 TokenType::Number,
                                 Literal::Number(self.source[self.start..self.current_index].parse().unwrap())
-                            )))
+                            )));
                         }
                     }
                 },
@@ -317,7 +317,7 @@ impl<'a> Tokenizer<'a> {
                     }
                 },
 
-                State::NoOp => return Ok(None)
+                State::NoOp => return Ok(None),
             }
 
             // Increment the pointer to the next character.
