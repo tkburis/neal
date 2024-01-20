@@ -301,8 +301,8 @@ impl Interpreter {
 
                         // Iterate through the arguments/parameters and evaluate them first.
                         let mut args_eval = Vec::new();
-                        for i in 0..arguments.len() {
-                            args_eval.push(self.evaluate(&arguments[i])?);
+                        for arg in arguments.iter() {
+                            args_eval.push(self.evaluate(arg)?);
                         }
 
                         // Decalre the variables in the new call scope.
