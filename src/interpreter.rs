@@ -36,7 +36,7 @@ impl Interpreter {
 
                 // Recursively execute each statement in the body of the `Block`.
                 for block_stmt in body {
-                    // ! Update report
+                    // We cannot just use `?` here as it will exit this function call right away and not call `exit_scope()`.
                     if let Err(e) = self.execute(block_stmt) {
                         self.environment.exit_scope();
                         return Err(e);
