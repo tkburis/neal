@@ -78,6 +78,7 @@ pub enum BuiltinFunction {
     Input,
     Remove,
     Size,
+    Sort,
     ToNumber,
     ToString,
 }

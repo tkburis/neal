@@ -434,11 +434,87 @@ impl Interpreter {
                                     // If `value` did not evaluate to an Array, a Dictionary, or a String, raise an error.
                                     _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array, Dictionary, or String"), got: value.type_to_string(), line: expr.line }),
                                 }
-                            }
+                            },
+                            BuiltinFunction::Sort => {
+                                // We want one argument: the array to be sorted.
+                                if arguments.len() != 1 {
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
+                                }
+
+                                let value = self.evaluate(&arguments[0])?;
+                                match value {
+                                    Value::Array(array) => {
+
+                                        fn merge_sort(a: &Vec<Value>, line: usize) -> Result<Vec<Value>, ErrorType> {
+                                            let n = a.len();
+                                            if n <= 1 {
+                                                return Ok(a.to_vec());
+                                            }
+
+                                            let left = merge_sort(&a[0..n/2].to_vec(), line)?;
+                                            let right = merge_sort(&a[n/2..].to_vec(), line)?;
+
+                                            let mut i = 0;
+                                            let mut j = 0;
+                                            let mut merged = Vec::new();
+
+                                            while i < left.len() && j < right.len() {
+                                                match (&left[i], &right[j]) {
+                                                    (Value::Number(left_num), Value::Number(right_num)) => {
+                                                        if left_num < right_num {
+                                                            merged.push(left[i].clone());
+                                                            i += 1;
+                                                        } else {
+                                                            merged.push(right[j].clone());
+                                                            j += 1;
+                                                        }
+                                                    },
+                                                    (Value::String_(left_str), Value::String_(right_str)) => {
+                                                        if left_str < right_str {
+                                                            merged.push(left[i].clone());
+                                                            i += 1;
+                                                        } else {
+                                                            merged.push(right[j].clone());
+                                                            j += 1;
+                                                        }
+                                                    },
+                                                    (_, _) => {
+                                                        return Err(ErrorType::BinaryTypeError {
+                                                            expected: String::from("Number or String"),
+                                                            got_left: left[i].type_to_string(),
+                                                            got_right: right[j].type_to_string(),
+                                                            line,
+                                                        });
+                                                    }
+                                                }
+                                            }
+
+                                            if i < left.len() {
+                                                while i < left.len() {
+                                                    merged.push(left[i].clone());
+                                                    i += 1;
+                                                }
+                                            }
+                                        
+                                            if j < right.len() {
+                                                while j < right.len() {
+                                                    merged.push(right[j].clone());
+                                                    j += 1;
+                                                }
+                                            }
+
+                                            Ok(merged)
+                                        }
+
+                                        Ok(Value::Array(merge_sort(&array, arguments[0].line)?))
+                                    },
+                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array"), got: value.type_to_string(), line: expr.line }),
+                                }
+                            },
                             BuiltinFunction::ToNumber => {
                                 // We want one argument: the Boolean value/number/string to be converted.
                                 if arguments.len() != 1 {
-                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })
+                                    return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line })  // todo: semicolons after returns
                                 }
 
                                 let value = self.evaluate(&arguments[0])?;

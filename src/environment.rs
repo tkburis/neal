@@ -24,6 +24,7 @@ impl Environment {
                 (String::from("input"), Value::BuiltinFunction(BuiltinFunction::Input)),
                 (String::from("remove"), Value::BuiltinFunction(BuiltinFunction::Remove)),
                 (String::from("size"), Value::BuiltinFunction(BuiltinFunction::Size)),
+                (String::from("sort"), Value::BuiltinFunction(BuiltinFunction::Sort)),
                 (String::from("to_number"), Value::BuiltinFunction(BuiltinFunction::ToNumber)),
                 (String::from("to_string"), Value::BuiltinFunction(BuiltinFunction::ToString)),
             ])],
