@@ -43,7 +43,6 @@ pub struct Tokenizer<'a> {
     tokens: Vec<Token>,  // Tokens that have been tokenized from source code.
     start: usize,  // Points to the start of the current token.
     current_index: usize,  // Points to the *next* character to be scanned.
-    current_state: State,  // The current state of the finite automaton.
     current_line: usize,  // Keeps track of the current line number.
 }
 
@@ -55,7 +54,6 @@ impl<'a> Tokenizer<'a> {
             tokens: Vec::new(),
             start: 0,
             current_index: 0,
-            current_state: State::Start,
             current_line: 1,
         }
     }
@@ -92,58 +90,58 @@ impl<'a> Tokenizer<'a> {
 
     /// Scans the token starting from `current_index`.
     fn scan_token(&mut self) -> Result<Option<Token>, ErrorType> {
-        self.current_state = State::Start;
+        let mut current_state = State::Start;  // The current state of the finite automaton.
         
         loop {
             // It is possible that the tokenizer reaches the end of the source code before `scan_token()` returns.
             // So we account for `current_char_opt` being None in all possible current states.
             let current_char_opt = self.source.chars().nth(self.current_index);
 
-            match self.current_state {
+            match current_state {
                 State::Start => {
                     self.start = self.current_index;  // The next token starts here.
                     if let Some(current_char) = current_char_opt {
                         match current_char {
-                            '(' => self.current_state = State::GotLeftParen,
-                            ')' => self.current_state = State::GotRightParen,
-                            '{' => self.current_state = State::GotLeftCurly,
-                            '}' => self.current_state = State::GotRightCurly,
-                            '[' => self.current_state = State::GotLeftSquare,
-                            ']' => self.current_state = State::GotRightSquare,
-                            ':' => self.current_state = State::GotColon,
-                            ',' => self.current_state = State::GotComma,
-                            '.' => self.current_state = State::GotDot,
-                            '-' => self.current_state = State::GotMinus,
-                            '%' => self.current_state = State::GotPercent,
-                            '+' => self.current_state = State::GotPlus,
-                            ';' => self.current_state = State::GotSemicolon,
-                            '/' => self.current_state = State::GotSlash,
-                            '*' => self.current_state = State::GotStar,
+                            '(' => current_state = State::GotLeftParen,
+                            ')' => current_state = State::GotRightParen,
+                            '{' => current_state = State::GotLeftCurly,
+                            '}' => current_state = State::GotRightCurly,
+                            '[' => current_state = State::GotLeftSquare,
+                            ']' => current_state = State::GotRightSquare,
+                            ':' => current_state = State::GotColon,
+                            ',' => current_state = State::GotComma,
+                            '.' => current_state = State::GotDot,
+                            '-' => current_state = State::GotMinus,
+                            '%' => current_state = State::GotPercent,
+                            '+' => current_state = State::GotPlus,
+                            ';' => current_state = State::GotSemicolon,
+                            '/' => current_state = State::GotSlash,
+                            '*' => current_state = State::GotStar,
                             
                             // For these tokens, we have to see the next character to be able to correctly identify the token.
-                            '!' => self.current_state = State::GotBang,
-                            '=' => self.current_state = State::GotEqual,
-                            '>' => self.current_state = State::GotGreater,
-                            '<' => self.current_state = State::GotLess,
+                            '!' => current_state = State::GotBang,
+                            '=' => current_state = State::GotEqual,
+                            '>' => current_state = State::GotGreater,
+                            '<' => current_state = State::GotLess,
                             
                             // Literals.
-                            '"' => self.current_state = State::InStringDouble,
-                            '\'' => self.current_state = State::InStringSingle,
+                            '"' => current_state = State::InStringDouble,
+                            '\'' => current_state = State::InStringSingle,
                             
-                            '0'..='9' => self.current_state = State::InNumberBeforeDot,
+                            '0'..='9' => current_state = State::InNumberBeforeDot,
                             
                             // Identifiers and keywords.
-                            'a'..='z' | 'A'..='Z' | '_' => self.current_state = State::InWord,
+                            'a'..='z' | 'A'..='Z' | '_' => current_state = State::InWord,
     
                             // Comments.
-                            '#' => self.current_state = State::InComment,
+                            '#' => current_state = State::InComment,
 
                             // Whitespace.
-                            ' ' | '\r' | '\t' => self.current_state = State::NoOp,
+                            ' ' | '\r' | '\t' => current_state = State::NoOp,
     
                             '\n' => {
                                 self.current_line += 1;
-                                self.current_state = State::NoOp;
+                                current_state = State::NoOp;
                             },
     
                             other => {
@@ -179,7 +177,7 @@ impl<'a> Tokenizer<'a> {
                 
                 State::GotBang => {
                     if current_char_opt == Some('=') {
-                        self.current_state = State::GotBangEqual;
+                        current_state = State::GotBangEqual;
                     } else {
                         // If the character isn't `=` or we are at the end, just make a `Bang` token.
                         return Ok(Some(self.construct_token(TokenType::Bang)));
@@ -188,21 +186,21 @@ impl<'a> Tokenizer<'a> {
 
                 State::GotEqual => {
                     if current_char_opt == Some('=') {
-                        self.current_state = State::GotEqualEqual;
+                        current_state = State::GotEqualEqual;
                     } else {
                         return Ok(Some(self.construct_token(TokenType::Equal)));
                     }
                 },
                 State::GotGreater => {
                     if current_char_opt == Some('=') {
-                        self.current_state = State::GotGreaterEqual;
+                        current_state = State::GotGreaterEqual;
                     } else {
                         return Ok(Some(self.construct_token(TokenType::Greater)));
                     }
                 },
                 State::GotLess => {
                     if current_char_opt == Some('=') {
-                        self.current_state = State::GotLessEqual;
+                        current_state = State::GotLessEqual;
                     } else {
                         return Ok(Some(self.construct_token(TokenType::Less)));
                     }
@@ -215,7 +213,7 @@ impl<'a> Tokenizer<'a> {
                 
                 State::InStringDouble => {
                     if current_char_opt == Some('"') {
-                        self.current_state = State::GotString;
+                        current_state = State::GotString;
                     } else if current_char_opt.is_none() {
                         // We have reached the end and there was no closing `"`.
                         return Err(ErrorType::UnterminatedString);
@@ -223,7 +221,7 @@ impl<'a> Tokenizer<'a> {
                 },
                 State::InStringSingle => {
                     if current_char_opt == Some('\'') {
-                        self.current_state = State::GotString;
+                        current_state = State::GotString;
                     } else if current_char_opt.is_none() {
                         // We have reached the end and there was no closing `"`.
                         return Err(ErrorType::UnterminatedString);
@@ -240,7 +238,7 @@ impl<'a> Tokenizer<'a> {
                     match current_char_opt {
                         Some(current_char) => {
                             if current_char == '.' {
-                                self.current_state = State::InNumberAfterDot;
+                                current_state = State::InNumberAfterDot;
                             } else if !current_char.is_ascii_digit() {
                                 // If it is not '0'-'9' (or a '.'), we have reached the end of the number.
                                 return Ok(Some(self.construct_token_with_literal(
@@ -311,9 +309,9 @@ impl<'a> Tokenizer<'a> {
                     // If we have a new line or we have reached the end of the file, the comment has ended.
                     if current_char_opt == Some('\n') {
                         self.current_line += 1;
-                        self.current_state = State::NoOp;
+                        current_state = State::NoOp;
                     } else if current_char_opt.is_none() {
-                        self.current_state = State::NoOp;
+                        current_state = State::NoOp;
                     }
                 },
 

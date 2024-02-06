@@ -8,21 +8,21 @@ pub enum TokenType {
     Colon, Comma, Dot, Minus, Percent,
     Plus, Semicolon, Slash, Star,
 
-    // One or two character tokens.
+    // One- or two-character tokens.
     Bang, BangEqual,
     Equal, EqualEqual,
     Greater, GreaterEqual,
     Less, LessEqual,
 
     // Literals.
-    Identifier, String_, Number,
+    True, False, String_, Number,
 
     // Keywords.
-    And, Break, Else, False,
+    And, Break, Else,
     Func, For, If, Null, Or, Print,
-    Return, True, Var, While,
+    Return, Var, While,
 
-    Eof,
+    Identifier, Eof
 }
 
 /// Literal values present in the source code.

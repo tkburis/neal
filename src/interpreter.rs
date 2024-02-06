@@ -350,7 +350,7 @@ impl Interpreter {
                                     Ok(Value::Array(array))
                                 } else {
                                     // If `target` is not an Array variant, raise an `ExpectedTypeError` and provide the received type.
-                                    Err(ErrorType::ExpectedTypeError { expected: String::from("Array"), got: target_eval.type_to_string(), line: target.line })
+                                    Err(ErrorType::ExpectedType { expected: String::from("Array"), got: target_eval.type_to_string(), line: target.line })
                                 }
                             },
                             BuiltinFunction::Input => {
@@ -397,7 +397,7 @@ impl Interpreter {
                                             array.remove(index);
                                         } else {
                                             // Otherwise, raise an out-of-bounds error.
-                                            return Err(ErrorType::OutOfBoundsIndexError { index, line: arguments[1].line });
+                                            return Err(ErrorType::OutOfBoundsIndex { index, line: arguments[1].line });
                                         }
                                         
                                         // Update the environment with the new array.
@@ -417,7 +417,7 @@ impl Interpreter {
                                         Ok(Value::Dictionary(dict))
                                     },
                                     // If it is not an Array or a Dictionary variant, then raise an `ExpectedTypeError`, providing the received type.
-                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array or Dictionary"), got: target_eval.type_to_string(), line: target.line }),
+                                    _ => Err(ErrorType::ExpectedType { expected: String::from("Array or Dictionary"), got: target_eval.type_to_string(), line: target.line }),
                                 }
                             },
                             BuiltinFunction::Size => {
@@ -432,7 +432,7 @@ impl Interpreter {
                                     Value::Dictionary(dict) => Ok(Value::Number(dict.size() as f64)),
                                     Value::String_(s) => Ok(Value::Number(s.len() as f64)),
                                     // If `value` did not evaluate to an Array, a Dictionary, or a String, raise an error.
-                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array, Dictionary, or String"), got: value.type_to_string(), line: expr.line }),
+                                    _ => Err(ErrorType::ExpectedType { expected: String::from("Array, Dictionary, or String"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                             BuiltinFunction::Sort => {
@@ -508,7 +508,7 @@ impl Interpreter {
 
                                         Ok(Value::Array(merge_sort(&array, arguments[0].line)?))
                                     },
-                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Array"), got: value.type_to_string(), line: expr.line }),
+                                    _ => Err(ErrorType::ExpectedType { expected: String::from("Array"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                             BuiltinFunction::ToNumber => {
@@ -530,10 +530,10 @@ impl Interpreter {
                                         match s.parse::<f64>() {
                                             Ok(x) => Ok(Value::Number(x)),
                                             // If something went wrong during the conversion, raise an error.
-                                            Err(..) => Err(ErrorType::ConvertToNumberError { line: expr.line }),
+                                            Err(..) => Err(ErrorType::CannotConvertToNumber { line: expr.line }),
                                         }
                                     },
-                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
+                                    _ => Err(ErrorType::ExpectedType { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                             BuiltinFunction::ToString => {
@@ -552,7 +552,7 @@ impl Interpreter {
                                     },
                                     Value::Number(x) => Ok(Value::String_(x.to_string())),
                                     Value::String_(..) => Ok(value),
-                                    _ => Err(ErrorType::ExpectedTypeError { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
+                                    _ => Err(ErrorType::ExpectedType { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                         }
@@ -595,7 +595,7 @@ impl Interpreter {
                             Ok(element.clone())
                         } else {
                             // In this case, `index_num` was out of bounds.
-                            Err(ErrorType::OutOfBoundsIndexError { index: index_num, line: expr.line })
+                            Err(ErrorType::OutOfBoundsIndex { index: index_num, line: expr.line })
                         }
                     },
                     Value::Dictionary(dict) => {
@@ -611,11 +611,11 @@ impl Interpreter {
                             Ok(Value::String_(String::from(c)))
                         } else {
                             // In this case, `index_num` was out of bounds.
-                            Err(ErrorType::OutOfBoundsIndexError { index: index_num, line: expr.line })
+                            Err(ErrorType::OutOfBoundsIndex { index: index_num, line: expr.line })
                         }
                     },
                     // If the 'array' was not an Array, a Dictionary, or a String variant, it cannot be indexed.
-                    _ => Err(ErrorType::NotIndexableError { line: array.line })
+                    _ => Err(ErrorType::NotIndexable { line: array.line })
                 }
             },
 
@@ -644,7 +644,7 @@ impl Interpreter {
                             Value::Bool(right_bool) => Ok(Value::Bool(!right_bool)),
                             // This operation only works with Boolean values, so raise an `ExpectedTypeError` error otherwise.
                             // Provide the received type for clarity.
-                            _ => Err(ErrorType::ExpectedTypeError {
+                            _ => Err(ErrorType::ExpectedType {
                                 expected: String::from("Boolean"),
                                 got: right_eval.type_to_string(),
                                 line: right.line,
@@ -657,7 +657,7 @@ impl Interpreter {
                             Value::Number(right_num) => Ok(Value::Number(-right_num)),
                             // This operation only works with Number variants, so raise an `ExpectedTypeError` error otherwise.
                             // Provide the received type for clarity.
-                            _ => Err(ErrorType::ExpectedTypeError {
+                            _ => Err(ErrorType::ExpectedType {
                                 expected: String::from("Number"),
                                 got: right_eval.type_to_string(),
                                 line: right.line,

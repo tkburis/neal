@@ -36,9 +36,6 @@ pub enum ErrorType {
     ExpectedParenAfterIncrement {
         line: usize,
     },
-    InvalidAssignmentTarget {
-        line: usize,
-    },
     ExpectedColonAfterKey {
         line: usize,
     },
@@ -48,28 +45,31 @@ pub enum ErrorType {
         name: String,
         line: usize,
     },
-    NotIndexableError {
+    NotIndexable {
         line: usize,
     },
-    OutOfBoundsIndexError {
+    OutOfBoundsIndex {
         index: usize,
         line: usize,
     },
-    InsertNonStringIntoStringError {
+    InsertNonStringIntoString {
         line: usize,
     },
     
     // Runtime errors.
-    ExpectedTypeError {
+    InvalidAssignmentTarget {
+        line: usize,
+    },
+    ExpectedType {
         expected: String,
         got: String,
         line: usize,
     },
-    NonNaturalIndexError {
+    NonNaturalIndex {
         got: Value,
         line: usize,
     },
-    NonNumberIndexError {
+    NonNumberIndex {
         got: String,
         line: usize,
     },
@@ -107,7 +107,7 @@ pub enum ErrorType {
     },
 
     // Conversion
-    ConvertToNumberError {
+    CannotConvertToNumber {
         line: usize,
     },
 
@@ -136,13 +136,13 @@ pub fn report_errors(errors: &[ErrorType]) {
 fn print_report(error: &ErrorType) {
     match error {
         ErrorType::UnexpectedCharacter { character, line } => {
-            println!("Line {0}: unexpected character `{1}`.", line, character);
+            println!("Line {}: unexpected character `{}`.", line, character);
         },
         ErrorType::UnterminatedString => {
             println!("Unterminated string at end of file.");
         },
         ErrorType::ExpectedCharacter { expected, line } => {
-            println!("Line {0}: expected character `{1}`", line, expected);
+            println!("Line {}: expected character `{}`", line, expected);
         },
         ErrorType::ExpectedExpression { line } => {
             println!("Line {}: expected expression.", line);
@@ -151,73 +151,73 @@ fn print_report(error: &ErrorType) {
             println!("Line {}: expected function name. Make sure it is not a keyword.", line);
         },
         ErrorType::ExpectedParameterName { line } => {
-            println!("Line {}: expected parameter name in function declaration.", line);
+            println!("Line {}: expected parameter name after a comma in function declaration.", line);
         },
         ErrorType::ExpectedVariableName { line } => {
-            println!("Line {}: expected variable name in declaration", line);
+            println!("Line {}: expected variable name. Make sure it is not a keyword.", line);
         },
         ErrorType::ExpectedSemicolonAfterInit { line } => {
-            println!("Line {}: expected `;` after initialising statement in `for` loop", line);
+            println!("Line {}: expected `;` after initialising statement in `for` loop.", line);
         },
         ErrorType::ExpectedSemicolonAfterCondition { line } => {
-            println!("Line {}: expected `;` after condition in `for` loop", line);
+            println!("Line {}: expected `;` after condition in `for` loop.", line);
         },
         ErrorType::ExpectedParenAfterIncrement { line } => {
             println!("Line {}: expected `)` after increment statement in `for` loop.", line);
-        },
-        ErrorType::InvalidAssignmentTarget { line } => {
-            println!("Line {}: invalid assignment target", line);
         },
         ErrorType::ExpectedColonAfterKey { line } => {
             println!("Line {}: expected colon after dictionary key.", line);
         },
         ErrorType::NameError { ref name, line } => {
-            println!("Line {0}: `{1}` is not defined.", line, name);
+            println!("Line {}: `{}` is not defined.", line, name);
         },
-        ErrorType::NotIndexableError { line } => {
+        ErrorType::NotIndexable { line } => {
             println!("Line {}: the value is not indexable.", line);
         },
-        ErrorType::OutOfBoundsIndexError { index, line } => {
-            println!("Line {0}: index `{1}` is out of bounds.", line, index);
+        ErrorType::OutOfBoundsIndex { index, line } => {
+            println!("Line {}: index `{}` is out of bounds.", line, index);
         },
-        ErrorType::InsertNonStringIntoStringError { line } => {
-            println!("Line {}: attempted to insert a non-String into a String.", line);
+        ErrorType::InsertNonStringIntoString { line } => {
+            println!("Line {}: attempted to insert a non-string into a string.", line);
         },
-        ErrorType::ExpectedTypeError { ref expected, ref got, line } => {
-            println!("Line {0}: expected type {1}, instead got type {2}", line, expected, got);
+        ErrorType::InvalidAssignmentTarget { line } => {
+            println!("Line {}: invalid assignment target.", line);
         },
-        ErrorType::NonNaturalIndexError { got, line } => {
-            println!("Line {0}: index evaluated to {1}, which is not a positive integer.", line, got);
+        ErrorType::ExpectedType { ref expected, ref got, line } => {
+            println!("Line {}: expected type {}; instead got type {}.", line, expected, got);
         },
-        ErrorType::NonNumberIndexError { got, line } => {
-            println!("Line {0}: index evaluated to a {1}, which is not a positive integer.", line, got);
+        ErrorType::NonNaturalIndex { got, line } => {
+            println!("Line {}: index evaluated to {}, which is not a positive integer.", line, got);
+        },
+        ErrorType::NonNumberIndex { got, line } => {
+            println!("Line {}: index evaluated to a {}, which is not a positive integer.", line, got);
         },
         ErrorType::BinaryTypeError { ref expected, ref got_left, ref got_right, line } => {
-            println!("Line {0}: this operation requires both sides' types to be {1}. Instead, got {2} and {3} respectively.", line, expected, got_left, got_right);
+            println!("Line {}: this operation requires both sides' types to be {}. Instead, got {} and {} respectively.", line, expected, got_left, got_right);
         },
         ErrorType::DivideByZero { line } => {
-            println!("Line {}: divisor is 0", line);
+            println!("Line {}: divisor is 0.", line);
         },
         ErrorType::IfConditionNotBoolean { line } => {
-            println!("Line {}: the `if` condition does not evaluate to a Boolean value.", line);
+            println!("Line {}: the `if` condition did not evaluate to a Boolean value.", line);
         },
         ErrorType::LoopConditionNotBoolean { line } => {
-            println!("Line {}: the condition of the loop does not evaluate to a Boolean value.", line);
+            println!("Line {}: the condition of the loop did not evaluate to a Boolean value.", line);
         },
         ErrorType::CannotCallName { line } => {
             println!("Line {}: cannot call name as a function.", line);
         },
         ErrorType::ArgParamNumberMismatch { arg_number, param_number, line } => {
-            println!("Line {}: attempted to call function with {} argument(s), but function accepts {}", line, arg_number, param_number);
+            println!("Line {}: attempted to call function with {} argument(s), but function accepts {}.", line, arg_number, param_number);
         },
         ErrorType::CannotHashFunction { line } => {
-            println!("Line {}: cannot hash `Function` type.", line);
+            println!("Line {}: cannot hash function (functions cannot be used as keys in dictionary entries).", line);
         },
         ErrorType::KeyError { key, line } => {
             println!("Line {}: key `{}` does not exist in the dictionary.", line, key);
         },
-        ErrorType::ConvertToNumberError { line } => {
-            println!("Line {}: could not convert to Number.", line);
+        ErrorType::CannotConvertToNumber { line } => {
+            println!("Line {}: could not convert to a number.", line);
         },
 
         ErrorType::ThrownReturn { value: _ , line} => {

@@ -93,7 +93,7 @@ impl Environment {
                                     current_element = el;
                                 } else {
                                     // If the index provided is out-of-bounds, raise an `OutOfBoundsIndexError`.
-                                    return Err(ErrorType::OutOfBoundsIndexError { index: idx, line });
+                                    return Err(ErrorType::OutOfBoundsIndex { index: idx, line });
                                 }
                             },
                             Value::Dictionary(dict) => {
@@ -102,7 +102,7 @@ impl Environment {
                             },
                             // If it is any other variant of `Value`, then we cannot index it.
                             // Note: strings can only be indexed with the last index, so it is not included here.
-                            _ => return Err(ErrorType::NotIndexableError { line }),
+                            _ => return Err(ErrorType::NotIndexable { line }),
                         }
                     }
 
@@ -119,7 +119,7 @@ impl Environment {
                                 current_element = el;
                             } else {
                                 // If the index provided is out-of-bounds or similar...
-                                return Err(ErrorType::OutOfBoundsIndexError { index: idx, line });
+                                return Err(ErrorType::OutOfBoundsIndex { index: idx, line });
                             }
                             *current_element = value.clone();
                         },
@@ -133,7 +133,7 @@ impl Environment {
 
                             // Make sure it is not out-of-bounds.
                             if s.get(idx..idx+1).is_none() {
-                                return Err(ErrorType::OutOfBoundsIndexError { index: idx, line });
+                                return Err(ErrorType::OutOfBoundsIndex { index: idx, line });
                             }
 
                             if let Value::String_(c) = value {
@@ -141,11 +141,11 @@ impl Environment {
                                 s.replace_range(idx..idx+1, c);
                             } else {
                                 // Otherwise, it cannot be inserted into a string.
-                                return Err(ErrorType::InsertNonStringIntoStringError { line });
+                                return Err(ErrorType::InsertNonStringIntoString { line });
                             }
                         },
                         // Any other variant of `Value` cannot be indexed.
-                        _ => return Err(ErrorType::NotIndexableError { line }),
+                        _ => return Err(ErrorType::NotIndexable { line }),
                     }
 
                     return Ok(());
@@ -176,11 +176,11 @@ pub fn index_value_to_usize(index: &Value, line: usize) -> Result<usize, ErrorTy
                 Ok(*index_num as usize)
             } else {
                 // If it is not non-negative or it is not an integer, then raise an error as it cannot be used as an index.
-                Err(ErrorType::NonNaturalIndexError { got: index.clone(), line })
+                Err(ErrorType::NonNaturalIndex { got: index.clone(), line })
             }
         },
         // If it is not a `Number` variant, then it cannot be used as an index, so raise an error.
-        _ => Err(ErrorType::NonNumberIndexError { got: index.type_to_string(), line })
+        _ => Err(ErrorType::NonNumberIndex { got: index.type_to_string(), line })
     }
 }
 
