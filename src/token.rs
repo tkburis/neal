@@ -5,7 +5,7 @@ pub enum TokenType {
     LeftParen, RightParen,
     LeftCurly, RightCurly,
     LeftSquare, RightSquare,
-    Colon, Comma, Dot, Minus, Percent,
+    Colon, Comma, Minus, Percent,
     Plus, Semicolon, Slash, Star,
 
     // One- or two-character tokens.
