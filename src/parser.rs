@@ -393,7 +393,7 @@ impl Parser {
 
     /// <assignment> ::= <or> (Equal <assignment>)?
     /// Note that it is done recursively instead of <assignment> ::= <or> (Equal <or>)* as it
-    /// is easier to enforce rightmost derivation with recursion on the right-hand side expression.
+    /// is easier to enforce rightmost associativity with recursion on the right-hand side expression.
     /// In other words, the parse tree should look like this `a = (b = (c = 3))` as opposed to
     /// `((a = b) = c) = 3`
     fn assignment(&mut self) -> Result<Expr, ErrorType> {
@@ -422,7 +422,7 @@ impl Parser {
     /// <or> ::= <and> (Or <and>)*
     /// Note that here, iteration is used instead of recursion because we can iteratively
     /// replace `expr` with another expression, using the previous `expr` as the left-hand side.
-    /// This enforces leftmost derivation and is the natural order of evaluation for binary operations,
+    /// This enforces leftmost associativity and is the natural order of evaluation for binary operations,
     /// which will become relevant when two operators have the same precedence and the order of evaluation
     /// depends on the order they come in, e.g., <plus_minus>.
     /// In other words, the parse tree should look like `((a or b) or c) or d`, as opposed to
@@ -439,7 +439,7 @@ impl Parser {
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
-                    left: Box::new(expr),  // Use the previous `expr` as the left-hand side to enforce leftmost derivation.
+                    left: Box::new(expr),  // Use the previous `expr` as the left-hand side to enforce leftmost associativity.
                     operator,  // Store the token object (Or), as this will be used to determine the operation in runtime.
                     right: Box::new(right),
                 }
@@ -561,7 +561,7 @@ impl Parser {
                 }
             })
         } else {
-            // Otherwise, assume it is of lower precedence and parse <element>.
+            // Otherwise, it is of lower precedence; parse <element>.
             self.element()
         }
     }
@@ -579,7 +579,7 @@ impl Parser {
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Element {
-                    array: Box::new(expr),  // Use the previous `expr` as the 'array' part to keep leftmost derivation.
+                    array: Box::new(expr),  // Use the previous `expr` as the 'array' part to keep leftmost associativity.
                     index: Box::new(index),
                 }
             };
@@ -619,7 +619,7 @@ impl Parser {
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Call {
-                    callee: Box::new(expr),  // Use the previous `expr` as the 'callee' part to keep the leftmost derivation.
+                    callee: Box::new(expr),  // Use the previous `expr` as the 'callee' part to keep the leftmost associativity.
                     arguments,
                 }
             }

@@ -320,11 +320,6 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    /// Helper function that adds a token without a literal value.
-    fn construct_token(&mut self, token_type: TokenType) -> Token {
-        self.construct_token_with_literal(token_type, Literal::Null)
-    }
-
     /// Helper function that adds a token with a literal value.
     fn construct_token_with_literal(&mut self, token_type: TokenType, literal: Literal) -> Token {
         Token {
@@ -333,6 +328,11 @@ impl<'a> Tokenizer<'a> {
             literal,
             line: self.current_line,
         }
+    }
+
+    /// Helper function that adds a token without a literal value.
+    fn construct_token(&mut self, token_type: TokenType) -> Token {
+        self.construct_token_with_literal(token_type, Literal::Null)
     }
 }
 
