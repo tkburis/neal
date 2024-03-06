@@ -101,6 +101,9 @@ pub enum ErrorType {
     CannotHashFunction {
         line: usize,
     },
+    CannotHashDictionary {
+        line: usize,
+    },
     KeyError {
         key: Value,
         line: usize,
@@ -212,6 +215,9 @@ fn print_report(error: &ErrorType) {
         },
         ErrorType::CannotHashFunction { line } => {
             println!("Line {}: cannot hash function (functions cannot be used as keys in dictionary entries).", line);
+        },
+        ErrorType::CannotHashDictionary { line } => {
+            println!("Line {}: cannot hash dictionary (dictionaries cannot be used as keys in dictionary entries).", line);
         },
         ErrorType::KeyError { key, line } => {
             println!("Line {}: key `{}` does not exist in the dictionary.", line, key);

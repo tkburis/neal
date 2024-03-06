@@ -4,12 +4,11 @@ use crate::{value::Value, error::ErrorType};
 
 // Hash table constants.
 const INITIAL_CAPACITY: usize = 16;  // Initial number of buckets in the table.
-const PRIME: usize = 53;  // A prime used in hash functions.
 const MAX_CAPACITY: usize = 65536;  // The maximum number of buckets in the table.
 const MAX_CALC: usize = 65381;  // A prime used to prevent overflow in intermediate calculations.
 const LOAD_FACTOR_NUMERATOR: usize = 3;  // Numerator of the maximum load factor before a rehash is required (3/4).
 const LOAD_FACTOR_DENOMINATOR: usize = 4;  // Denominator of the maximum load factor before a rehash is required (3/4).
-const HASH_FIRST_N: usize = 20;  // Number of elements to hash to keep constant time operation.
+const HASH_FIRST_N: usize = 300;  // Number of elements to hash to keep constant time operation.
 
 // A key-value pair in the hash table.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -188,9 +187,10 @@ fn hash(key: &Value, mut elements_left: usize, line: usize) -> Result<(usize, us
             let mut hash_value: usize = 5381;
             let mut index: usize = 0;
 
+            // Limit the number of elements to `elements_left`, which can change depending on the recursive calls.
             while elements_left > 0 && index < array.len() {
-                let result = hash(&array[index], elements_left, line)?;
-                let curr = (result.0 * index) % MAX_CALC;
+                let result = hash(&array[index], elements_left, line)?;  // (hash, elements_left)
+                let curr = result.0 % MAX_CALC;
                 hash_value = (((hash_value << 5) + hash_value) + curr) % MAX_CALC; // Equivalent to `* 33 + curr`, but faster
                 
                 elements_left = result.1;
@@ -199,39 +199,16 @@ fn hash(key: &Value, mut elements_left: usize, line: usize) -> Result<(usize, us
 
             Ok((hash_value, elements_left))
         },
-        Value::Bool(x) => {
-            if *x {
+        Value::Bool(b) => {
+            if *b {
                 Ok((1, elements_left - 1))
             } else {
                 Ok((2, elements_left - 1))
             }
         },
-        Value::Dictionary(x) => {
-            let mut hash_value: usize = 5381;
-            let mut bucket_index: usize = 0;
-
-            while elements_left > 0 && bucket_index < x.array.len() {
-                if x.array[bucket_index].is_empty() {
-                    elements_left -= 1;
-                } else {
-                    let mut key_value_index: usize = 0;
-                    while elements_left > 0 && key_value_index < x.array[bucket_index].len() {
-                        let key_hash_result = hash(&x.array[bucket_index][key_value_index].key, elements_left, line)?;
-                        let key_hash = key_hash_result.0 % MAX_CALC;
-                        elements_left = key_hash_result.1;
-
-                        let value_hash_result = hash(&x.array[bucket_index][key_value_index].value, elements_left, line)?;
-                        let value_hash = value_hash_result.0 % MAX_CALC;
-                        elements_left = value_hash_result.1;
-                        
-                        hash_value = (hash_value + key_hash * (value_hash + PRIME)) % MAX_CALC;
-                        key_value_index += 1;
-                    }
-                }
-                bucket_index += 1;
-            }
-
-            Ok((hash_value, elements_left))
+        Value::Dictionary(..) => {
+            // Hashing dictionaries in constant time will involve more sophisticated techniques.
+            Err(ErrorType::CannotHashDictionary { line })
         },
         Value::Function {..} | Value::BuiltinFunction(..) => {
             // It is tricky to hash functions as the comparison of two functions is not set in stone.
@@ -254,7 +231,7 @@ fn hash(key: &Value, mut elements_left: usize, line: usize) -> Result<(usize, us
             let mut index = 0;
 
             while elements_left > 0 && index < s.chars().count() {
-                hash_value = (((hash_value << 5) + hash_value) + (s.chars().nth(index).unwrap() as usize * index)) % MAX_CALC;
+                hash_value = (((hash_value << 5) + hash_value) + s.chars().nth(index).unwrap() as usize) % MAX_CALC;
                 elements_left -= 1;
                 index += 1;
             }
