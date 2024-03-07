@@ -3,11 +3,11 @@ use std::fmt::Debug;
 use crate::{value::Value, error::ErrorType};
 
 // Hash table constants.
-const INITIAL_CAPACITY: usize = 16;  // Initial number of buckets in the table.
-const MAX_CAPACITY: usize = 65536;  // The maximum number of buckets in the table.
+const INITIAL_NUM_BUCKETS: usize = 16;  // Initial number of buckets in the table.
+const MAX_NUM_BUCKETS: usize = 65536;  // The maximum number of buckets in the table.
 const MAX_CALC: usize = 65381;  // A prime used to prevent overflow in intermediate calculations.
-const LOAD_FACTOR_NUMERATOR: usize = 3;  // Numerator of the maximum load factor before a rehash is required (3/4).
-const LOAD_FACTOR_DENOMINATOR: usize = 4;  // Denominator of the maximum load factor before a rehash is required (3/4).
+const MAX_LOAD_FACTOR_NUMERATOR: usize = 3;  // Numerator of the maximum load factor before a rehash is required (3/4).
+const MAX_LOAD_FACTOR_DENOMINATOR: usize = 4;  // Denominator of the maximum load factor before a rehash is required (3/4).
 const HASH_FIRST_N: usize = 300;  // Number of elements to hash to keep constant time operation.
 
 // A key-value pair in the hash table.
@@ -22,16 +22,16 @@ pub struct KeyValue<T> {
 pub struct HashTable {
     array: Vec<Vec<KeyValue<Value>>>,  // The internal array of the hash table.
     entries: usize, // The number of entries in the hash table.
-    current_capacity: usize,  // The current capacity in the hash table, i.e., the current number of buckets.
+    current_num_buckets: usize,  // The current number of buckets in the table.
 }
 
 impl HashTable {
     /// Initialises a new instance of `HashTable`.
     pub fn new() -> Self {
         Self {
-            array: vec![Vec::new(); INITIAL_CAPACITY],  // Initially has an `INITIAL_CAPACITY` number of buckets.
+            array: vec![Vec::new(); INITIAL_NUM_BUCKETS],  // Initialise 2D array with `INITIAL_NUM_BUCKETS` number of empty arrays.
             entries: 0,
-            current_capacity: INITIAL_CAPACITY,
+            current_num_buckets: INITIAL_NUM_BUCKETS,
         }
     }
 
@@ -108,17 +108,17 @@ impl HashTable {
 
     /// Checks the load factor of the table and performs rehashing if required.
     fn check_load(&mut self, line: usize) -> Result<(), ErrorType> {
-        if self.current_capacity < MAX_CAPACITY && self.entries * LOAD_FACTOR_DENOMINATOR > self.current_capacity * LOAD_FACTOR_NUMERATOR {
+        if self.current_num_buckets < MAX_NUM_BUCKETS && self.entries * MAX_LOAD_FACTOR_DENOMINATOR > self.current_num_buckets * MAX_LOAD_FACTOR_NUMERATOR {
             // If `current_capacity` is less than the maximum capacity and greater than the maximum load factor, perform rehashing.
 
             // Make a copy of the entries in the table.
             let copy = self.flatten();
 
             // Double the current capacity of the table.
-            self.current_capacity <<= 1;
+            self.current_num_buckets <<= 1;
 
             // Repopulate the internal array with `current_capacity` number of empty buckets.
-            self.array = vec![Vec::new(); self.current_capacity];
+            self.array = vec![Vec::new(); self.current_num_buckets];
 
             // For each entry in the saved table, re-insert it in the new table.
             for entry in copy.iter() {
@@ -130,8 +130,7 @@ impl HashTable {
 
     /// Calculates the bucket number of a key.
     fn get_bucket_number(&self, key: &Value, line: usize) -> Result<usize, ErrorType> {
-        println!("{:#?}", hash(key, HASH_FIRST_N, line)?.0);
-        Ok(hash(key, HASH_FIRST_N, line)?.0 % self.current_capacity)
+        Ok(hash(key, HASH_FIRST_N, line)?.0 % self.current_num_buckets)
     }
 
     /// Returns all the key-value pairs in the table in a one-dimensional array.
