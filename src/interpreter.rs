@@ -159,9 +159,7 @@ impl Interpreter {
                 match self.construct_pointer(target, expr.line) {
                     // Use the pointer to update the value in the environment.
                     Ok(pointer) => self.environment.update(&pointer, &value_eval, expr.line)?,
-                    // If the 'base expression' is a literal, e.g., [1,2][0], then do nothing.
-                    Err(ErrorType::ThrownLiteralAssignment) => (),
-                    // If another error occurred, continue to raise it.
+                    // If an error occurred (invalid assignment target), continue to raise it.
                     Err(e) => return Err(e),
                 };
 
@@ -695,10 +693,7 @@ impl Interpreter {
                 // Return an empty `indices` array to be populated in the recursion.
                 Ok(Pointer {name: name.clone(), indices: Vec::new()})
             },
-            // Attempting to update literal values has no side effect as they are, by definition, stateless.
-            // So we can ignore them.
-            ExprType::Array {..} | ExprType::Call {..} | ExprType::Dictionary {..} => Err(ErrorType::ThrownLiteralAssignment),
-            // Otherwise, the variant does not support assignment, so raise an error (e.g., a binary expression).
+            // Otherwise, the variant does not support assignment, so raise an error (e.g., a binary expression or a literal array/dictionary).
             _ => Err(ErrorType::InvalidAssignmentTarget { line }),
         }
     }

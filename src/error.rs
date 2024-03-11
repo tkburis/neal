@@ -122,7 +122,6 @@ pub enum ErrorType {
     ThrownBreak {
         line: usize,
     },
-    ThrownLiteralAssignment,
 }
 
 /// Prints the error message for each error in `errors`.
@@ -182,7 +181,7 @@ fn print_report(error: &ErrorType) {
             println!("Line {}: attempted to insert a non-string into a string.", line);
         },
         ErrorType::InvalidAssignmentTarget { line } => {
-            println!("Line {}: invalid assignment target.", line);
+            println!("Line {}: invalid assignment target. Make sure you are not assigning to a literal.", line);
         },
         ErrorType::ExpectedType { ref expected, ref got, line } => {
             println!("Line {}: expected type {}; instead got type {}.", line, expected, got);
@@ -229,9 +228,6 @@ fn print_report(error: &ErrorType) {
         },
         ErrorType::ThrownBreak { line } => {
             println!("Line {}: `break` has to be used within a loop.", line);
-        },
-        ErrorType::ThrownLiteralAssignment => {
-            panic!("`ThrownLiteralAssignment` was not caught.");  // This should be unreachable.
         },
     }
 }
