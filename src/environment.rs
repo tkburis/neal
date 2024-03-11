@@ -36,7 +36,7 @@ impl Environment {
         self.scopes.push(HashMap::new());
     }
 
-    /// Exits and removes the outermost scope.
+    /// Exits and removes the right-most scope.
     pub fn exit_scope(&mut self) {
         self.scopes.pop();
         if self.scopes.is_empty() {
@@ -47,7 +47,7 @@ impl Environment {
     /// Declares a name-value pair in the current scope.
     pub fn declare(&mut self, name: String, value: &Value) {
         if let Some(last_scope) = self.scopes.last_mut() {
-            // If there is at least one scope, insert the name-value pair into the outermost scope.
+            // If there is at least one scope, insert the name-value pair into the right-most scope.
             last_scope.insert(name, value.clone());
         } else {
             // Should be unreachable.
@@ -56,10 +56,10 @@ impl Environment {
     }
 
     /// Returns the value associated with `name`. As there could be multiple values associated with `name`
-    /// across all the scopes, return the one in the outermost scope.
+    /// across all the scopes, return the one in the right-most scope.
     pub fn get(&self, name: String, line: usize) -> Result<Value, ErrorType> {
         for scope in self.scopes.iter().rev() {
-            // Iterate from the outermost scope.
+            // Iterate from the right-most scope.
             if let Some(object) = scope.get(&name) {
                 // If there is a value associated with `name`, return the value immediately.
                 return Ok(object.clone());
@@ -70,10 +70,10 @@ impl Environment {
         Err(ErrorType::NameError { name, line })
     }
 
-    /// Updates the value associated with the pointer. Again, update the one in the outermost scope only.
+    /// Updates the value associated with the pointer. Again, update the one in the right-most scope only.
     pub fn update(&mut self, pointer: &Pointer, value: &Value, line: usize) -> Result<(), ErrorType> {
         for scope in self.scopes.iter_mut().rev() {
-            // Iterate from the outermost scope.
+            // Iterate from the right-most scope.
             if let Some(object) = scope.get_mut(&pointer.name) {
                 // If there is a value associated with `pointer.name`...
                 if !pointer.indices.is_empty() {

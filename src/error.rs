@@ -122,9 +122,7 @@ pub enum ErrorType {
     ThrownBreak {
         line: usize,
     },
-    ThrownLiteralAssignment {
-        line: usize,
-    },
+    ThrownLiteralAssignment,
 }
 
 /// Prints the error message for each error in `errors`.
@@ -232,8 +230,8 @@ fn print_report(error: &ErrorType) {
         ErrorType::ThrownBreak { line } => {
             println!("Line {}: `break` has to be used within a loop.", line);
         },
-        ErrorType::ThrownLiteralAssignment { line } => {
-            println!("Line {}: attempt to assign to a literal.", line);
+        ErrorType::ThrownLiteralAssignment => {
+            panic!("`ThrownLiteralAssignment` was not caught.");  // This should be unreachable.
         },
     }
 }
