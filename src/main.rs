@@ -31,7 +31,7 @@ fn main() {
         run_file(&args[1]);
     } else {
         // No file path was given. In this case, we run the REPL.
-        run_prompt();
+        run_repl();
     }
 }
 
@@ -44,8 +44,9 @@ fn run_file(file_path: &str) {
 }
 
 /// Runs the interactive REPL in the console.
-fn run_prompt() {
-    let mut interpreter = Interpreter::new();  // We need the same Interpreter instance across all REPL command to preserve the environment (variables, etc.).
+fn run_repl() {
+    // We need the same Interpreter instance across all REPL command to preserve the environment (variables, etc.).
+    let mut interpreter = Interpreter::new();
     loop {
         print!("> ");
         io::stdout().flush().expect("Error: flush failed");  // to flush out "> "

@@ -291,11 +291,12 @@ impl Interpreter {
                         if arguments.len() != parameters.len() {
                             // If the number of arguments given does not match the number of parameters expected,
                             // raise a detailed error.
-                            return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: parameters.len(), line: expr.line });
+                            return Err(ErrorType::ArgParamNumberMismatch {
+                                arg_number: arguments.len(),
+                                param_number: parameters.len(),
+                                line: expr.line
+                            });
                         }
-                        
-                        // Create a new variable scope.
-                        self.environment.new_scope();
 
                         // Iterate through the arguments/parameters and evaluate them first.
                         let mut args_eval = Vec::new();
@@ -303,17 +304,20 @@ impl Interpreter {
                             args_eval.push(self.evaluate(arg)?);
                         }
 
-                        // Decalre the variables in the new call scope.
+                        // Create a new variable scope for the arguments and function execution.
+                        self.environment.new_scope();
+
+                        // Declare the variables in the new call scope.
                         for i in 0..arguments.len() {
                             self.environment.declare(parameters[i].clone(), &args_eval[i]);
                         }
-                        
-                        // Execute the function body.
+
+                        // Execute function body.
                         let exec_result = self.execute(&body);
 
-                        // Exit the variable scope.
+                        // Exit scope.
                         self.environment.exit_scope();
-                        
+
                         match exec_result {
                             // If there was no return statement, evaluate to Null.
                             Ok(()) => Ok(Value::Null),
@@ -443,61 +447,64 @@ impl Interpreter {
                                 match value {
                                     Value::Array(array) => {
 
-                                        fn merge_sort(a: &Vec<Value>, line: usize) -> Result<Vec<Value>, ErrorType> {
-                                            let n = a.len();
-                                            if n <= 1 {
-                                                return Ok(a.to_vec());
+                                        fn merge_sort(array_to_sort: &Vec<Value>, line: usize) -> Result<Vec<Value>, ErrorType> {
+                                            let n = array_to_sort.len();
+                                            if n <= 1 {  // Base case
+                                                return Ok(array_to_sort.to_vec());
                                             }
 
-                                            let left = merge_sort(&a[0..n/2].to_vec(), line)?;
-                                            let right = merge_sort(&a[n/2..].to_vec(), line)?;
+                                            // Recursively sort the left and right halves of the array.
+                                            let left = merge_sort(&array_to_sort[0..n/2].to_vec(), line)?;
+                                            let right = merge_sort(&array_to_sort[n/2..].to_vec(), line)?;
 
-                                            let mut i = 0;
-                                            let mut j = 0;
+                                            // Merge the two sorted arrays.
+                                            let mut left_index = 0;
+                                            let mut right_index = 0;
                                             let mut merged = Vec::new();
 
-                                            while i < left.len() && j < right.len() {
-                                                match (&left[i], &right[j]) {
+                                            while left_index < left.len() && right_index < right.len() {
+                                                match (&left[left_index], &right[right_index]) {
                                                     (Value::Number(left_num), Value::Number(right_num)) => {
                                                         if left_num < right_num {
-                                                            merged.push(left[i].clone());
-                                                            i += 1;
+                                                            merged.push(left[left_index].clone());
+                                                            left_index += 1;
                                                         } else {
-                                                            merged.push(right[j].clone());
-                                                            j += 1;
+                                                            merged.push(right[right_index].clone());
+                                                            right_index += 1;
                                                         }
                                                     },
                                                     (Value::String_(left_str), Value::String_(right_str)) => {
                                                         if left_str < right_str {
-                                                            merged.push(left[i].clone());
-                                                            i += 1;
+                                                            merged.push(left[left_index].clone());
+                                                            left_index += 1;
                                                         } else {
-                                                            merged.push(right[j].clone());
-                                                            j += 1;
+                                                            merged.push(right[right_index].clone());
+                                                            right_index += 1;
                                                         }
                                                     },
-                                                    (_, _) => {
+                                                    (_, _) => {  // We only support comparisons between numbers and between strings.
                                                         return Err(ErrorType::BinaryTypeError {
                                                             expected: String::from("Number or String"),
-                                                            got_left: left[i].type_to_string(),
-                                                            got_right: right[j].type_to_string(),
+                                                            got_left: left[left_index].type_to_string(),
+                                                            got_right: right[right_index].type_to_string(),
                                                             line,
                                                         });
                                                     }
                                                 }
                                             }
 
-                                            if i < left.len() {
-                                                while i < left.len() {
-                                                    merged.push(left[i].clone());
-                                                    i += 1;
+                                            // Append the remainder of `left` or `right` to the merged array.
+                                            if left_index < left.len() {
+                                                while left_index < left.len() {
+                                                    merged.push(left[left_index].clone());
+                                                    left_index += 1;
                                                 }
                                             }
                                         
-                                            if j < right.len() {
-                                                while j < right.len() {
-                                                    merged.push(right[j].clone());
-                                                    j += 1;
+                                            if right_index < right.len() {
+                                                while right_index < right.len() {
+                                                    merged.push(right[right_index].clone());
+                                                    right_index += 1;
                                                 }
                                             }
 
@@ -650,7 +657,7 @@ impl Interpreter {
                         }
                     },
                     TokenType::Minus => {
-                        // If the operator is `-`
+                        // If the operator is `-`...
                         match right_eval {
                             Value::Number(right_num) => Ok(Value::Number(-right_num)),
                             // This operation only works with Number variants, so raise an `ExpectedTypeError` error otherwise.
