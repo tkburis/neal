@@ -1,6 +1,7 @@
 use std::fmt;
 
-use crate::{stmt::Stmt, hash_table::HashTable};
+use crate::stmt::Stmt;
+use crate::hash_table::HashTable;
 
 /// Represents evaluated/stored values within the interpreter.
 #[derive(Clone, Debug, PartialEq)]

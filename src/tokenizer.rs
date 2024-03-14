@@ -1,4 +1,5 @@
-use crate::{token::{Token, TokenType, Literal}, error::{self, ErrorType}};
+use crate::token::{Token, TokenType, Literal};
+use crate::error::{self, ErrorType};
 
 /// The states of the DFA.
 #[derive(Debug)]

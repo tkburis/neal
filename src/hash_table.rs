@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
-use crate::{value::Value, error::ErrorType};
+use crate::value::Value;
+use crate::error::ErrorType;
 
 // Hash table constants.
 const INITIAL_NUM_BUCKETS: usize = 16;  // Initial number of buckets in the table.

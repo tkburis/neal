@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use crate::{value::{Value, BuiltinFunction}, error::ErrorType};
+use crate::value::{Value, BuiltinFunction};
+use crate::error::ErrorType;
 
 /// Allows the updating of elements in multi-dimensional arrays and dictionaries.
 #[derive(Debug)]

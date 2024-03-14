@@ -1,4 +1,5 @@
-use crate::{token, hash_table::KeyValue};
+use crate::token;
+use crate::hash_table::KeyValue;
 
 /// An expression.
 #[derive(Clone, Debug, PartialEq)]

@@ -1,6 +1,12 @@
 use std::io::{Write, self};
 
-use crate::{environment::{Environment, Pointer, self}, expr::{Expr, ExprType}, token::{TokenType, Literal}, error::{ErrorType, self}, stmt::{Stmt, StmtType}, value::{Value, BuiltinFunction}, hash_table::HashTable};
+use crate::environment::{Environment, Pointer, self};
+use crate::expr::{Expr, ExprType};
+use crate::token::{TokenType, Literal};
+use crate::error::{ErrorType, self};
+use crate::stmt::{Stmt, StmtType};
+use crate::value::{Value, BuiltinFunction};
+use crate::hash_table::HashTable;
 
 /// Recursively traverses the abstract syntax tree, executes statements, and evaluates expressions.
 pub struct Interpreter {
