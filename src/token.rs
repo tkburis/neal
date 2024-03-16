@@ -1,4 +1,4 @@
-// Possible types of tokens.
+/// Possible types of tokens.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
@@ -25,7 +25,7 @@ pub enum TokenType {
     Identifier, Eof
 }
 
-/// Literal values present in the source code.
+/// Literal values declared in the source code.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
     Number(f64),
@@ -37,8 +37,8 @@ pub enum Literal {
 /// A token.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
-    pub type_: TokenType,  // Type of token.
-    pub lexeme: String,  // The substring from the source code from which the token was constructed.
-    pub literal: Literal,  // The literal value (number/string/Boolean) the token represents; otherwise, Literal::Null.
+    pub type_: TokenType,  // The type of the token.
+    pub lexeme: String,  // The source code substring from which the token was constructed.
+    pub literal: Literal,  // The literal value (number/string/Boolean) the token represents; if the token is not a literal, will be set to the `Null` variant.
     pub line: usize,  // The line number of the source code from which the token was constructed.
 }

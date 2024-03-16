@@ -4,8 +4,8 @@ use crate::hash_table::KeyValue;
 /// An expression.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expr {
-    pub line: usize,
-    pub expr_type: ExprType,
+    pub line: usize,  // The line of the source code from which the expression was derived.
+    pub expr_type: ExprType,  // The type of expression.
 }
 
 /// Possible types of expressions.

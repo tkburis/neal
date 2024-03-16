@@ -1,16 +1,16 @@
 use crate::value::Value;
 
-/// Possible errors that may occur during execution.
+/// Possible errors that may occur during execution. This type will be used when bubbling up errors.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ErrorType {
-    // Tokenizing errors.
+    // Lexical analysis errors, i.e., tokenization errors.
     UnexpectedCharacter {
         character: char,
         line: usize,
     },
     UnterminatedString,
 
-    // Parsing errors.
+    // Syntax analysis errors, i.e., syntax errors.
     ExpectedCharacter {
         expected: char,
         line: usize,
@@ -56,7 +56,7 @@ pub enum ErrorType {
         line: usize,
     },
     
-    // Runtime errors.
+    // Execution errors, i.e., runtime errors.
     InvalidAssignmentTarget {
         line: usize,
     },
@@ -96,8 +96,11 @@ pub enum ErrorType {
         param_number: usize,
         line: usize,
     },
+    CannotConvertToNumber {
+        line: usize,
+    },
 
-    // Hash table
+    // Hash table errors.
     CannotHashFunction {
         line: usize,
     },
@@ -109,17 +112,15 @@ pub enum ErrorType {
         line: usize,
     },
 
-    // Conversion
-    CannotConvertToNumber {
+    // Special errors.
+    // These will be used to unwind the call stack when a break or return statement is used.
+    // If used correctly, these will be caught within the interpreter.
+    // If not, e.g., a return statement was used outside a function, the error will be reported.
+    ThrownBreak {
         line: usize,
     },
-
-    // Misc.
     ThrownReturn {
         value: Value,
-        line: usize,
-    },
-    ThrownBreak {
         line: usize,
     },
 }
@@ -132,15 +133,18 @@ pub fn report_errors(errors: &[ErrorType]) {
     }
 }
 
-/// Prints the error message for an error.
+/// Prints the error message for an individual error.
 fn print_report(error: &ErrorType) {
     match error {
+        // Lexical analysis errors, i.e., tokenization errors.
         ErrorType::UnexpectedCharacter { character, line } => {
             println!("Line {}: unexpected character `{}`.", line, character);
         },
         ErrorType::UnterminatedString => {
             println!("Unterminated string at end of file.");
         },
+
+        // Syntax analysis errors, i.e., syntax errors.
         ErrorType::ExpectedCharacter { expected, line } => {
             println!("Line {}: expected character `{}`", line, expected);
         },
@@ -168,6 +172,8 @@ fn print_report(error: &ErrorType) {
         ErrorType::ExpectedColonAfterKey { line } => {
             println!("Line {}: expected colon after dictionary key.", line);
         },
+
+        // Environment errors.
         ErrorType::NameError { ref name, line } => {
             println!("Line {}: `{}` is not defined.", line, name);
         },
@@ -180,6 +186,8 @@ fn print_report(error: &ErrorType) {
         ErrorType::InsertNonStringIntoString { line } => {
             println!("Line {}: attempted to insert a non-string into a string.", line);
         },
+
+        // Execution errors, i.e., runtime errors.
         ErrorType::InvalidAssignmentTarget { line } => {
             println!("Line {}: invalid assignment target. Make sure you are not assigning to a literal.", line);
         },
@@ -210,6 +218,11 @@ fn print_report(error: &ErrorType) {
         ErrorType::ArgParamNumberMismatch { arg_number, param_number, line } => {
             println!("Line {}: attempted to call function with {} argument(s), but function accepts {}.", line, arg_number, param_number);
         },
+        ErrorType::CannotConvertToNumber { line } => {
+            println!("Line {}: could not convert to a number.", line);
+        },
+
+        // Hash table errors.
         ErrorType::CannotHashFunction { line } => {
             println!("Line {}: cannot hash function (functions cannot be used as keys in dictionary entries).", line);
         },
@@ -219,15 +232,13 @@ fn print_report(error: &ErrorType) {
         ErrorType::KeyError { key, line } => {
             println!("Line {}: key `{}` does not exist in the dictionary.", line, key);
         },
-        ErrorType::CannotConvertToNumber { line } => {
-            println!("Line {}: could not convert to a number.", line);
-        },
 
-        ErrorType::ThrownReturn { value: _ , line} => {
-            println!("Line {}: `return` has to be used within a function.", line);
-        },
+        // Special errors.
         ErrorType::ThrownBreak { line } => {
             println!("Line {}: `break` has to be used within a loop.", line);
+        },
+        ErrorType::ThrownReturn { value: _ , line} => {
+            println!("Line {}: `return` has to be used within a function.", line);
         },
     }
 }

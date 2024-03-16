@@ -166,8 +166,7 @@ impl PartialEq for HashTable {
             }
         }
 
-        // All entries in `self` correspond to an entry in `other`, and they have the same number of entries,
-        // so they must be equal.
+        // All entries in `self` correspond to an entry in `other` and they have the same number of entries, so they must be equal.
         true
     }
 }

@@ -56,13 +56,13 @@ impl Interpreter {
 
             StmtType::Break => {
                 // Throw a `ThrownBreak` error which can be caught in the `While` statement (see below).
-                // This immediately stops execution and unravels the call stack to the nearest parent `While` statement,
-                // which emulates the behaviour of a `break` statement.
+                // This immediately stops execution and unwinds the call stack to the nearest parent `While` statement, which emulates the behaviour of a `break` statement.
                 Err(ErrorType::ThrownBreak { line: stmt.line })
             },
 
             StmtType::Expression { expression } => {
-                // Evaluate the expression. This is used for expressions with side effects, e.g., assignments and function calls.
+                // Evaluate the expression.
+                // This is used for expressions with side effects, e.g., assignments and function calls.
                 self.evaluate(expression)?;
                 Ok(())
             },
@@ -81,17 +81,17 @@ impl Interpreter {
                     Value::Bool(condition_bool) => {
                         // If the condition evaluated to a Boolean value...
                         if condition_bool {
-                            // If the condition is `true`, execute the `then` body.
+                            // and the condition is `true`, execute the `then` body.
                             self.execute(then_body.as_ref())?;
                         } else if let Some(else_) = else_body {
-                            // If the condition is `false`, and there is an `else` body, then execute that.
+                            // and the condition is `false`, and there is an `else` body, then execute that.
                             self.execute(else_.as_ref())?;
                         }
                         // Otherwise, do nothing.
                         Ok(())
                     },
                     // If the condition did not evaluate to a Boolean value, we cannot use it as the condition in an `If` statement.
-                    // Raise a helpful and detailed error.
+                    // Raise a clear and specific error.
                     _ => Err(ErrorType::IfConditionNotBoolean { line: condition.line })
                 }
             },
@@ -125,7 +125,7 @@ impl Interpreter {
                     let continue_ = match self.evaluate(condition)? {
                         // If `condition` evaluated to a Boolean value, set `continue_` to the result of that.
                         Value::Bool(condition_bool) => condition_bool,
-                        // Otherwise, it cannot be used as the condition for a loop.
+                        // Otherwise, it cannot be used as the condition for a loop, so raise a specific error.
                         _ => return Err(ErrorType::LoopConditionNotBoolean { line: stmt.line }),
                     };
 
@@ -137,9 +137,9 @@ impl Interpreter {
                     match self.execute(body.as_ref()) {
                         // If the body executed with no errors, continue as normal.
                         Ok(()) => (),
-                        // If a `ThrownBreak` error was thrown, break the loop.
+                        // If a `ThrownBreak` error was thrown somewhere in the body, break the loop.
                         Err(ErrorType::ThrownBreak {..}) => break,
-                        // If a different error was thrown, continue to raise that error.
+                        // If a different error was thrown, continue to bubble up that error.
                         Err(e) => return Err(e),
                     }
                 }
@@ -152,7 +152,7 @@ impl Interpreter {
     fn evaluate(&mut self, expr: &Expr) -> Result<Value, ErrorType> {
         match &expr.expr_type {
             ExprType::Array { elements } => {
-                // Evaluate each expression in the array to a `Value`, and collect that in an array.
+                // Evaluate each expression in the array to a `Value`, and collect those in an array.
                 let values: Result<Vec<Value>, _> = elements.iter().map(|x| self.evaluate(x)).collect();
                 Ok(Value::Array(values?))
             },
@@ -165,12 +165,11 @@ impl Interpreter {
                 match self.construct_pointer(target, expr.line) {
                     // Use the pointer to update the value in the environment.
                     Ok(pointer) => self.environment.update(&pointer, &value_eval, expr.line)?,
-                    // If an error occurred (invalid assignment target), continue to raise it.
+                    // If an error occurred (invalid assignment target), continue to bubble it up.
                     Err(e) => return Err(e),
                 };
 
-                // Evaluate to the right-hand side value, i.e.,
-                // a = (b = 5) -> a = 5.
+                // Evaluate to the right-hand side value, e.g., a = (b = 5) -> a = 5.
                 Ok(value_eval)
             },
 
@@ -192,6 +191,8 @@ impl Interpreter {
                                 }
                             },
                             (_, _) => {
+                                // We can only perform logical operations if both sides evaluate to Booleans.
+                                // If this is not the case, raise a descriptive error.
                                 Err(ErrorType::BinaryTypeError {
                                     expected: String::from("Boolean"),
                                     got_left: left_eval.type_to_string(),
@@ -294,9 +295,9 @@ impl Interpreter {
 
                 match function {
                     Value::Function { parameters, body } => {
+                        // User-defined functions.
                         if arguments.len() != parameters.len() {
-                            // If the number of arguments given does not match the number of parameters expected,
-                            // raise a detailed error.
+                            // If the number of arguments given does not match the number of parameters expected, raise a detailed error.
                             return Err(ErrorType::ArgParamNumberMismatch {
                                 arg_number: arguments.len(),
                                 param_number: parameters.len(),
@@ -304,7 +305,7 @@ impl Interpreter {
                             });
                         }
 
-                        // Iterate through the arguments/parameters and evaluate them first.
+                        // Iterate through the arguments and evaluate each.
                         let mut args_eval = Vec::new();
                         for arg in arguments.iter() {
                             args_eval.push(self.evaluate(arg)?);
@@ -313,7 +314,7 @@ impl Interpreter {
                         // Create a new variable scope for the arguments and function execution.
                         self.environment.new_scope();
 
-                        // Declare the variables in the new call scope.
+                        // Declare the arguments in the new scope.
                         for i in 0..arguments.len() {
                             self.environment.declare(parameters[i].clone(), &args_eval[i]);
                         }
@@ -325,16 +326,17 @@ impl Interpreter {
                         self.environment.exit_scope();
 
                         match exec_result {
-                            // If there was no return statement, evaluate to Null.
+                            // If the function execution did not raise any error, evaluate the call to `Null` (no return statement used in function).
                             Ok(()) => Ok(Value::Null),
-                            // If the execution ended in a `ThrownReturn` error, evaluate to the given value.
+                            // If the execution ended because of a raised `ThrownReturn` error, then evaluate the call to the given return vale.
                             Err(ErrorType::ThrownReturn { value, line: _ }) => Ok(value),
-                            // If another error occurred, continue to raise the error.
+                            // If another error occurred, continue to bubble up the error.
                             Err(e) => Err(e),
                         }
                     },
 
                     Value::BuiltinFunction(function) => {
+                        // Built-in functions.
                         match function {
                             BuiltinFunction::Append => {
                                 // We want two arguments: the target array, and the value to append.
@@ -357,6 +359,7 @@ impl Interpreter {
                                     // Evaluate to changed array.
                                     Ok(Value::Array(array))
                                 } else {
+                                    // We can only append to arrays.
                                     // If `target` is not an Array variant, raise an `ExpectedTypeError` and provide the received type.
                                     Err(ErrorType::ExpectedType { expected: String::from("Array"), got: target_eval.type_to_string(), line: target.line })
                                 }
@@ -401,7 +404,7 @@ impl Interpreter {
 
                                         if index < array.len() {
                                             // If `index` is not out-of-bounds, perform the removal.
-                                            // Note: `usize` is guaranteed to be non-negative.
+                                            // Note `usize` is guaranteed to be non-negative.
                                             array.remove(index);
                                         } else {
                                             // Otherwise, raise an out-of-bounds error.
@@ -449,81 +452,17 @@ impl Interpreter {
                                     return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
 
-                                let value = self.evaluate(&arguments[0])?;
+                                let value = self.evaluate(&arguments[0])?; 
                                 match value {
-                                    Value::Array(array) => {
+                                    // If given argument is an array, sort using the `merge_sort` function defined below.
+                                    Value::Array(array) => Ok(Value::Array(merge_sort(&array, arguments[0].line)?)),
 
-                                        fn merge_sort(array_to_sort: &Vec<Value>, line: usize) -> Result<Vec<Value>, ErrorType> {
-                                            let n = array_to_sort.len();
-                                            if n <= 1 {  // Base case
-                                                return Ok(array_to_sort.to_vec());
-                                            }
-
-                                            // Recursively sort the left and right halves of the array.
-                                            let left = merge_sort(&array_to_sort[0..n/2].to_vec(), line)?;
-                                            let right = merge_sort(&array_to_sort[n/2..].to_vec(), line)?;
-
-                                            // Merge the two sorted arrays.
-                                            let mut left_index = 0;
-                                            let mut right_index = 0;
-                                            let mut merged = Vec::new();
-
-                                            while left_index < left.len() && right_index < right.len() {
-                                                match (&left[left_index], &right[right_index]) {
-                                                    (Value::Number(left_num), Value::Number(right_num)) => {
-                                                        if left_num < right_num {
-                                                            merged.push(left[left_index].clone());
-                                                            left_index += 1;
-                                                        } else {
-                                                            merged.push(right[right_index].clone());
-                                                            right_index += 1;
-                                                        }
-                                                    },
-                                                    (Value::String_(left_str), Value::String_(right_str)) => {
-                                                        if left_str < right_str {
-                                                            merged.push(left[left_index].clone());
-                                                            left_index += 1;
-                                                        } else {
-                                                            merged.push(right[right_index].clone());
-                                                            right_index += 1;
-                                                        }
-                                                    },
-                                                    (_, _) => {  // We only support comparisons between numbers and between strings.
-                                                        return Err(ErrorType::BinaryTypeError {
-                                                            expected: String::from("Number or String"),
-                                                            got_left: left[left_index].type_to_string(),
-                                                            got_right: right[right_index].type_to_string(),
-                                                            line,
-                                                        });
-                                                    }
-                                                }
-                                            }
-
-                                            // Append the remainder of `left` or `right` to the merged array.
-                                            if left_index < left.len() {
-                                                while left_index < left.len() {
-                                                    merged.push(left[left_index].clone());
-                                                    left_index += 1;
-                                                }
-                                            }
-                                        
-                                            if right_index < right.len() {
-                                                while right_index < right.len() {
-                                                    merged.push(right[right_index].clone());
-                                                    right_index += 1;
-                                                }
-                                            }
-
-                                            Ok(merged)
-                                        }
-
-                                        Ok(Value::Array(merge_sort(&array, arguments[0].line)?))
-                                    },
+                                    // We cannot sort objects which are not arrays, so raise an error.
                                     _ => Err(ErrorType::ExpectedType { expected: String::from("Array"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                             BuiltinFunction::ToNumber => {
-                                // We want one argument: the Boolean value/number/string to be converted.
+                                // We want one argument: the Boolean/number/string to be converted.
                                 if arguments.len() != 1 {
                                     return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
@@ -540,15 +479,18 @@ impl Interpreter {
                                     Value::String_(s) => {
                                         match s.parse::<f64>() {
                                             Ok(x) => Ok(Value::Number(x)),
-                                            // If something went wrong during the conversion, raise an error.
+                                            // If something went wrong during Rust's conversion, raise an error.
                                             Err(..) => Err(ErrorType::CannotConvertToNumber { line: expr.line }),
                                         }
                                     },
+
+                                    // We can only construct numeric representations of Booleans, numbers, and strings.
+                                    // If not given one of these, raise an error.
                                     _ => Err(ErrorType::ExpectedType { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                             BuiltinFunction::ToString => {
-                                // We want one argument: the Boolean value/number/string to be converted.
+                                // We want one argument: the Boolean/number/string to be converted.
                                 if arguments.len() != 1 {
                                     return Err(ErrorType::ArgParamNumberMismatch { arg_number: arguments.len(), param_number: 1, line: expr.line });
                                 }
@@ -563,12 +505,17 @@ impl Interpreter {
                                     },
                                     Value::Number(x) => Ok(Value::String_(x.to_string())),
                                     Value::String_(..) => Ok(value),
+
+                                    // We can only construct string representations of Booleans, numbers, and strings.
+                                    // If not given one of these, raise an error.
                                     _ => Err(ErrorType::ExpectedType { expected: String::from("Boolean, Number or String"), got: value.type_to_string(), line: expr.line }),
                                 }
                             },
                         }
                     },
-                    // If `function` was not a Function or a BuiltinFunction variant of the `Value` enum, then we cannot call it. Raise an error.
+
+                    // If the evaluated `function` was not a `Function` or a `BuiltinFunction` variant, then we cannot 'call' it.
+                    // So raise an error.
                     _ => Err(ErrorType::CannotCallName { line: callee.line })
                 }
             },
@@ -577,9 +524,9 @@ impl Interpreter {
                 // Create a new hash table.
                 let mut hash_table = HashTable::new();
 
-                // Iterate through the key-value pairs of the elements.
+                // Iterate through the key-value pairs of the given elements.
                 for key_value in elements.iter() {
-                    // Evaluate each of the key and value.
+                    // Evaluate each of the keys and values.
                     let key_eval = self.evaluate(&key_value.key)?;
                     let value_eval = self.evaluate(&key_value.value)?;
 
@@ -596,9 +543,9 @@ impl Interpreter {
                 // Evaluate the index expression.
                 let index_eval = self.evaluate(index.as_ref())?;
 
-                match self.evaluate(array.as_ref())? {
+                match self.evaluate(array.as_ref())? {  // Evaluate `array`.
                     Value::Array(array) => {
-                        // If the 'array' is an Array variant, convert the evaluated index to a `usize` index.
+                        // If the evaluated 'array' is an Array variant, convert the evaluated index to a `usize` index.
                         let index_num = environment::index_value_to_usize(&index_eval, index.line)?;
                         
                         // Try to get the element of `array` at index `index_num`.
@@ -610,11 +557,11 @@ impl Interpreter {
                         }
                     },
                     Value::Dictionary(dict) => {
-                        // If the 'array' is a Dictionary variant, let `HashTable` deal with it.
+                        // If the evaluated 'array' is a Dictionary variant, get value from the `HashTable` object.
                         dict.get(&index_eval, expr.line).cloned()
                     },
                     Value::String_(s) => {
-                        // If the 'array' is a String variant, convert the evaluated index to a `usize` index.
+                        // If the evaluated 'array' is a String variant, convert the evaluated index to a `usize` index.
                         let index_num = environment::index_value_to_usize(&index_eval, index.line)?;
 
                         // Try to get the character of `s` at index `index_num`.
@@ -691,7 +638,7 @@ impl Interpreter {
     fn construct_pointer(&mut self, element: &Expr, line: usize) -> Result<Pointer, ErrorType> {
         match &element.expr_type {
             ExprType::Element { array, index } => {
-                // The recursive case.
+                // Recursive case.
                 // E.g., a[1][2][3] -> Pointer("a", [1, 2]), [3] -> Pointer("a", [1, 2, 3])
                 // So we simply add the index of the current element to the Pointer constructed in the recursion.
                 let Pointer {name, indices} = self.construct_pointer(array.as_ref(), line)?;
@@ -699,15 +646,89 @@ impl Interpreter {
                 // Make a copy of the `indices` array and append the index of the current element.
                 let mut indices_copy = indices;
                 indices_copy.push(self.evaluate(index.as_ref())?);
-                Ok(Pointer {name, indices: indices_copy})
+
+                // Return a `Pointer` with the appended index.
+                Ok(Pointer { name, indices: indices_copy })
             },
             ExprType::Variable { name } => {
-                // The base case.
+                // Base case.
                 // Return an empty `indices` array to be populated in the recursion.
                 Ok(Pointer {name: name.clone(), indices: Vec::new()})
             },
-            // Otherwise, the variant does not support assignment, so raise an error (e.g., a binary expression or a literal array/dictionary).
+            // Otherwise, the variant does not support assignment, so raise an error (e.g., a literal array/dictionary, a binary expression, etc.).
             _ => Err(ErrorType::InvalidAssignmentTarget { line }),
         }
     }
+}
+
+fn merge_sort(array_to_sort: &Vec<Value>, line: usize) -> Result<Vec<Value>, ErrorType> {
+    let n = array_to_sort.len();
+
+    // Base case.
+    if n <= 1 {
+        return Ok(array_to_sort.to_vec());
+    }
+
+    // Recursive case.
+
+    // Recursively sort the left and right halves of the array.
+    let left = merge_sort(&array_to_sort[0..n/2].to_vec(), line)?;
+    let right = merge_sort(&array_to_sort[n/2..].to_vec(), line)?;
+
+    // Merge the two sorted arrays using two pointers.
+    let mut left_index = 0;
+    let mut right_index = 0;
+    let mut merged = Vec::new();
+
+    while left_index < left.len() && right_index < right.len() {
+        match (&left[left_index], &right[right_index]) {
+            // Append the 'lower' of the two to the merged array, and advance the respective pointer.
+            (Value::Number(left_num), Value::Number(right_num)) => {
+                if left_num < right_num {
+                    merged.push(left[left_index].clone());
+                    left_index += 1;
+                } else {
+                    merged.push(right[right_index].clone());
+                    right_index += 1;
+                }
+            },
+            (Value::String_(left_str), Value::String_(right_str)) => {
+                if left_str < right_str {
+                    merged.push(left[left_index].clone());
+                    left_index += 1;
+                } else {
+                    merged.push(right[right_index].clone());
+                    right_index += 1;
+                }
+            },
+
+            // We only support comparisons between numbers and between strings.
+            (_, _) => {
+                return Err(ErrorType::BinaryTypeError {
+                    expected: String::from("Number or String"),
+                    got_left: left[left_index].type_to_string(),
+                    got_right: right[right_index].type_to_string(),
+                    line,
+                });
+            }
+        }
+    }
+
+    // Only one of `left` and `right` will have any elements left.
+    // Append the remainder to the merged array.
+    if left_index < left.len() {
+        while left_index < left.len() {
+            merged.push(left[left_index].clone());
+            left_index += 1;
+        }
+    }
+
+    if right_index < right.len() {
+        while right_index < right.len() {
+            merged.push(right[right_index].clone());
+            right_index += 1;
+        }
+    }
+
+    Ok(merged)
 }

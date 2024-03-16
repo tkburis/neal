@@ -3,8 +3,8 @@ use crate::expr::Expr;
 /// A statement.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stmt {
-    pub line: usize,
-    pub stmt_type: StmtType,
+    pub line: usize,  // The line of the source code from which the statement was derived.
+    pub stmt_type: StmtType,  // The type of the statement.
 }
 
 /// Possible types of statements.

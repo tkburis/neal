@@ -6,13 +6,13 @@ use crate::token::{Token, TokenType, Literal};
 
 /// Performs syntax analysis.
 pub struct Parser {
-    tokens: Vec<Token>,
-    current_index: usize,
-    current_line: usize,
+    tokens: Vec<Token>,  // The input sequence of tokens.
+    current_index: usize,  // An index pointing to the current token.
+    current_line: usize,  // The current line number.
 }
 
 impl Parser {
-    /// Initialises a new instance of `Parser`, given the sequence of tokens.
+    /// Constructs a new `Parser` object given the sequence of tokens.
     pub fn new(tokens: Vec<Token>) -> Self {
         Self {
             tokens,
@@ -21,11 +21,11 @@ impl Parser {
         }
     }
 
-    /// Returns the abstract syntax tree of the source code as a sequence of statements.
+    /// The interface method which returns the abstract syntax tree of the source code as a sequence of statements.
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<ErrorType>> {
         let mut statements: Vec<Stmt> = Vec::new();  // The abstract syntax tree.
 
-        // We aim to collect as many errors as possible in one run into a vector and report them all at the same time.
+        // We aim to collect as many errors as possible in one run into a vector and report them all at once.
         let mut errors: Vec<ErrorType> = Vec::new();
 
         while !self.check_next(&[TokenType::Eof]) {
@@ -33,7 +33,7 @@ impl Parser {
             match self.statement() {
                 Ok(statement) => statements.push(statement),
                 Err(error) => {
-                    // If an error occurred during the parse, collect the error and synchronise.
+                    // If an error occurred during the parse, collect the error, synchronise, and continue.
                     errors.push(error);
                     self.sync();
                 },
@@ -41,10 +41,10 @@ impl Parser {
         }
         
         if errors.is_empty() {
-            // No error occurred, return the sequence of statements.
+            // If no error occurred, return the sequence of statements.
             Ok(statements)
         } else {
-            // Report all the errors and return an Err() so that the driver code knows that it cannot go on.
+            // If errors occurred, report all the errors and return an `Err` variant so that the driver code terminates execution.
             error::report_errors(&errors[..]);
             Err(errors)
         }
@@ -165,7 +165,7 @@ impl Parser {
             increment = Some(self.statement()?);
         }
 
-        // Consume RightParen if it is given; otherwise, raise a specific error.
+        // Consume RightParen if it follows; otherwise, raise a specific error.
         if self.check_and_consume(&[TokenType::RightParen]).is_none() {
             return Err(ErrorType::ExpectedParenAfterIncrement { line: self.current_line });
         }
@@ -242,7 +242,7 @@ impl Parser {
                     }
 
                     // If a Comma does not follow a parameter, then there should be no more parameters.
-                    // Otherwise, if a Comma was found, consume it.
+                    // Otherwise, if a Comma was found, consume it, and parse the next parameter.
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
                         break;
                     }
@@ -264,7 +264,7 @@ impl Parser {
                 }
             })
         } else {
-            // Otherwise, raise a specific error.
+            // If an Identifier was not given, raise a specific error.
             Err(ErrorType::ExpectedFunctionName { line: self.current_line })
         }
     }
@@ -309,7 +309,7 @@ impl Parser {
 
     /// <else> ::= If <if> | <block>
     fn else_(&mut self) -> Result<Stmt, ErrorType> {
-        // After an `else`, there can either be another block, which ends the `if` statement, or an `if` to make an `else if`.
+        // After an `else`, there can either be another block, which ends the `if` statement and creates the `else` body, or an `if` to make an `else if`.
         if self.check_and_consume(&[TokenType::If]).is_some() {
             // If there is an If token, consume it, then parse <if> to create an `else if`.
             Ok(self.if_()?)
@@ -357,7 +357,7 @@ impl Parser {
                 }
             })
         } else {
-            // Otherwise, raise a specific error.
+            // If an Identifier was not given, raise a specific error.
             Err(ErrorType::ExpectedVariableName { line: self.current_line })
         }
     }
@@ -393,7 +393,7 @@ impl Parser {
 
     /// <assignment> ::= <or> (Equal <assignment>)?
     /// Note that it is done recursively instead of <assignment> ::= <or> (Equal <or>)* as it
-    /// is easier to enforce rightmost associativity with recursion on the right-hand side expression.
+    /// is easier to enforce right associativity with recursion on the right-hand side expression.
     /// In other words, the parse tree should look like this `a = (b = (c = 3))` as opposed to
     /// `((a = b) = c) = 3`
     fn assignment(&mut self) -> Result<Expr, ErrorType> {
@@ -414,7 +414,7 @@ impl Parser {
                 }
             })
         } else {
-            // Otherwise, just return the expression as is.
+            // If an Equal does not follow, just return the expression as is.
             Ok(expr)
         }
     }
@@ -422,7 +422,7 @@ impl Parser {
     /// <or> ::= <and> (Or <and>)*
     /// Note that here, iteration is used instead of recursion because we can iteratively
     /// replace `expr` with another expression, using the previous `expr` as the left-hand side.
-    /// This enforces leftmost associativity and is the natural order of evaluation for binary operations,
+    /// This enforces left associativity and is the natural order of evaluation for binary operations,
     /// which will become relevant when two operators have the same precedence and the order of evaluation
     /// depends on the order they come in, e.g., <plus_minus>.
     /// In other words, the parse tree should look like `((a or b) or c) or d`, as opposed to
@@ -439,7 +439,7 @@ impl Parser {
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Binary {
-                    left: Box::new(expr),  // Use the previous `expr` as the left-hand side to enforce leftmost associativity.
+                    left: Box::new(expr),  // Use the previous `expr` as the left-hand side to enforce left associativity.
                     operator,  // Store the token object (Or), as this will be used to determine the operation in runtime.
                     right: Box::new(right),
                 }
@@ -545,8 +545,7 @@ impl Parser {
         Ok(expr)
     }
 
-    /// <unary> ::= (Bang | Minus) <unary> |
-    ///             <element>
+    /// <unary> ::= (Bang | Minus) <unary> | <element>
     fn unary(&mut self) -> Result<Expr, ErrorType> {
         if let Some(operator) = self.check_and_consume(&[TokenType::Bang, TokenType::Minus]) {
             // If the current token is either Bang or Minus, consume it.
@@ -579,7 +578,7 @@ impl Parser {
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Element {
-                    array: Box::new(expr),  // Use the previous `expr` as the 'array' part to keep leftmost associativity.
+                    array: Box::new(expr),  // Use the previous `expr` as the 'array' part to keep left associativity.
                     index: Box::new(index),
                 }
             };
@@ -602,9 +601,9 @@ impl Parser {
             let mut arguments: Vec<Expr> = Vec::new();
             
             if !self.check_next(&[TokenType::RightParen]) {
-                // If there are arguments, i.e., not just f().
+                // If there are arguments, i.e., not just f()...
                 loop {
-                    // Keep parsing the argument expressions and pushing them to the array of arguments...
+                    // keep parsing the argument expressions and pushing them to the array of arguments...
                     arguments.push(self.expression()?);
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
                         // until the next token is not a Comma, in which case, there are no more arguments.
@@ -619,7 +618,7 @@ impl Parser {
             expr = Expr {
                 line: self.current_line,
                 expr_type: ExprType::Call {
-                    callee: Box::new(expr),  // Use the previous `expr` as the 'callee' part to keep the leftmost associativity.
+                    callee: Box::new(expr),  // Use the previous `expr` as the 'callee' part to keep left associativity.
                     arguments,
                 }
             }
@@ -642,7 +641,7 @@ impl Parser {
             TokenType::Null
         ]) {
             // Literal.
-            // If the token is a String_, Number, True, False, or Null, use its literal value,
+            // If the token is a `String_`, `Number`, `True`, `False`, or `Null`, use its literal value,
             // which is stored as an attribute in the Token object.
             Ok(Expr {
                 line: self.current_line,
@@ -674,13 +673,12 @@ impl Parser {
             let mut elements: Vec<Expr> = Vec::new();
             
             if !self.check_next(&[TokenType::RightSquare]) {
-                // If there are elements, i.e., not just [].
+                // If there are elements, i.e., not just []...
                 loop {
-                    // Keep parsing the element expressions and pushing them to the array of elements...
+                    // keep parsing the element expressions and pushing them to the array of elements...
                     elements.push(self.expression()?);
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
-                        // until the next token is not a Comma, in which case,
-                        // we assume there are no more elements in the array.
+                        // until the next token is not a Comma, in which case, we assume there are no more elements in the array.
                         break;
                     }
                 }
@@ -688,7 +686,12 @@ impl Parser {
             
             // Consume the closing RightSquare.
             self.expect(TokenType::RightSquare, ']')?;
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Array { elements }})
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Array { 
+                    elements 
+                }
+            })
 
         } else if self.check_and_consume(&[TokenType::LeftCurly]).is_some() {
             // Dictionary.
@@ -717,8 +720,7 @@ impl Parser {
                     elements.push(KeyValue { key, value });
 
                     if self.check_and_consume(&[TokenType::Comma]).is_none() {
-                        // Loop until the next token is not a Comma, in which case,
-                        // we assume there are no more entries in the dictionary.
+                        // Loop until the next token is not a Comma, in which case, we assume there are no more entries in the dictionary.
                         break;
                     }
                 }
@@ -726,13 +728,23 @@ impl Parser {
 
             // Consume the closing RightCurly.
             self.expect(TokenType::RightCurly, '}')?;
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Dictionary { elements } })
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Dictionary {
+                    elements
+                }
+            })
 
         } else if let Some(identifier) = self.check_and_consume(&[TokenType::Identifier]) {
             // Variable.
             // If the token is an Identifier, use its stored lexeme which will be the variable name.
             // Note 'variable' in this case also means function names.
-            Ok(Expr { line: self.current_line, expr_type: ExprType::Variable { name: identifier.lexeme }})
+            Ok(Expr {
+                line: self.current_line,
+                expr_type: ExprType::Variable {
+                    name: identifier.lexeme
+                }
+            })
 
         } else {
             // If no rule matches the token, then we expected an expression but was not given one.
@@ -764,8 +776,7 @@ impl Parser {
 
     /// Returns `true` if the type of the next token is one of the `expected_types`.
     /// Otherwise, or if we are at the end of the sequence of tokens, return `false`.
-    /// The difference between this and `check_and_consume()` is that this does not advance the pointer if
-    /// the token matches what is expected.
+    /// The difference between this and `check_and_consume()` is that this does not advance the pointer if the token matches what is expected.
     fn check_next(&self, expected_types: &[TokenType]) -> bool {
         if let Some(token) = self.tokens.get(self.current_index) {
             // If we are not at the end of the sequence of tokens, return whether or not
@@ -779,12 +790,10 @@ impl Parser {
 
     /// Returns `Ok(())` and advances the pointer if the type of the next token is one of the `expected_types`.
     /// Otherwise, return `Err(ErrorType::ExpectedCharacter)`.
-    /// The difference between this and `check_and_consume()` is that this does not return the token itself,
-    /// just an error to be bubbled up.
+    /// The difference between this and `check_and_consume()` is that this does not return the token itself, just an error to be bubbled up.
     fn expect(&mut self, expected_type: TokenType, expected_char: char) -> Result<(), ErrorType> {
         if self.check_and_consume(&[expected_type]).is_none() {
-            // If `check_and_consume()` returned `None`, i.e., the token does not match or we are at the end of
-            // the sequence of tokens, return an `ExpectedCharacter` error.
+            // If `check_and_consume()` returned `None`, i.e., the token does not match or we are at the end of the sequence of tokens, return an `ExpectedCharacter` error.
             return Err(ErrorType::ExpectedCharacter {
                 expected: expected_char,
                 line: self.current_line,
