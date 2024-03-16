@@ -239,3 +239,79 @@ fn hash(key: &Value, mut elements_left: usize, line: usize) -> Result<(usize, us
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{error::ErrorType, stmt::{Stmt, StmtType}, value::Value};
+
+    use super::HashTable;
+
+    #[test]
+    fn insert_and_get() {
+        let mut dict = HashTable::new();
+        assert!(dict.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert_eq!(dict.get(&Value::Number(5.0), 1), Ok(&Value::String_("hello".to_string())));
+    }
+
+    #[test]
+    fn insert_duplicate_and_get() {
+        let mut dict = HashTable::new();
+        assert!(dict.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict.insert(&Value::Number(5.0), &Value::String_("hi".to_string()), 1).is_ok());
+        assert_eq!(dict.get(&Value::Number(5.0), 1), Ok(&Value::String_("hi".to_string())));
+    }
+
+    #[test]
+    fn insert_remove_size() {
+        let mut dict = HashTable::new();
+        assert!(dict.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict.insert(&Value::String_("key1".to_string()), &Value::String_("hi".to_string()), 1).is_ok());
+        assert_eq!(dict.size(), 2);
+
+        assert!(dict.remove(&Value::Number(5.0), 1).is_ok());
+        assert_eq!(dict.size(), 1)
+    }
+    
+    #[test]
+    fn key_error() {
+        let dict = HashTable::new();
+        assert_eq!(dict.get(&Value::Number(5.0), 1), Err(ErrorType::KeyError { key: Value::Number(5.0), line: 1 }));
+    }
+
+    #[test]
+    fn cannot_hash_errors() {
+        let dict = HashTable::new();
+        assert_eq!(dict.get(&Value::Function { parameters: vec![], body: Stmt { line: 1, stmt_type: StmtType::Break } }, 1), Err(ErrorType::CannotHashFunction { line: 1 }));
+        assert_eq!(dict.get(&Value::Dictionary(HashTable::new()), 1), Err(ErrorType::CannotHashDictionary { line: 1 }));
+    }
+
+    #[test]
+    fn equality() {
+        let mut dict1 = HashTable::new();
+        let mut dict2 = HashTable::new();
+        assert!(dict1.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict1.insert(&Value::Number(6.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict1.insert(&Value::Number(7.0), &Value::String_("hello".to_string()), 1).is_ok());
+
+        assert!(dict2.insert(&Value::Number(7.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict2.insert(&Value::Number(6.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict2.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+
+        assert_eq!(dict1, dict2);
+    }
+
+    #[test]
+    fn inequality() {
+        let mut dict1 = HashTable::new();
+        let mut dict2 = HashTable::new();
+        assert!(dict1.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict1.insert(&Value::Number(6.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict1.insert(&Value::Number(7.0), &Value::String_("hello".to_string()), 1).is_ok());
+
+        assert!(dict2.insert(&Value::Number(8.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict2.insert(&Value::Number(6.0), &Value::String_("hello".to_string()), 1).is_ok());
+        assert!(dict2.insert(&Value::Number(5.0), &Value::String_("hello".to_string()), 1).is_ok());
+
+        assert_ne!(dict1, dict2);
+    }
+}

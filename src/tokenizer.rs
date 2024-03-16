@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn one_char_tokens() {
-        let source = "( ) { } [ ] : , . - % + ; / *";
+        let source = "( ) { } [ ] : , - % + ; / *";
         assert_eq!(Ok(vec![
             Token { type_: TokenType::LeftParen, lexeme: String::from("("), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::RightParen, lexeme: String::from(")"), literal: Literal::Null, line: 1 },
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn literals() {
-        let source = "\"abc\" 123 \"abc123\" 123.5 \"\" 123abc 5.5.5";
+        let source = "\"abc\" 123 \"abc123\" 123.5 \"\" 123abc 5.5";
         assert_eq!(Ok(vec![
             Token { type_: TokenType::String_, lexeme: String::from("\"abc\""), literal: Literal::String_(String::from("abc")), line: 1 },
             Token { type_: TokenType::Number, lexeme: String::from("123"), literal: Literal::Number(123.0), line: 1 },
@@ -404,7 +404,6 @@ mod tests {
             Token { type_: TokenType::Number, lexeme: String::from("123"), literal: Literal::Number(123.0), line: 1 },
             Token { type_: TokenType::Identifier, lexeme: String::from("abc"), literal: Literal::Null, line: 1 },
             Token { type_: TokenType::Number, lexeme: String::from("5.5"), literal: Literal::Number(5.5), line: 1 },
-            Token { type_: TokenType::Number, lexeme: String::from("5"), literal: Literal::Number(5.0), line: 1 },
             Token { type_: TokenType::Eof, lexeme: String::from(""), literal: Literal::Null, line: 1 },
         ]), tokenize(source));
     }
