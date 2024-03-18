@@ -67,7 +67,7 @@ impl fmt::Display for Value {
                 write!(f, "}}")
             }
             Self::Function {..} | Self::BuiltinFunction(..) => write!(f, "<function>"),
-            Self::Null => write!(f, "Null"),
+            Self::Null => write!(f, "null"),
         }
     }
 }

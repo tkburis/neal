@@ -141,7 +141,7 @@ fn print_report(error: &ErrorType) {
             println!("Line {}: unexpected character `{}`.", line, character);
         },
         ErrorType::UnterminatedString => {
-            println!("Unterminated string at end of file.");
+            println!("A string was never closed by the end of the program.");
         },
 
         // Syntax analysis errors, i.e., syntax errors.
@@ -155,7 +155,7 @@ fn print_report(error: &ErrorType) {
             println!("Line {}: expected function name. Make sure it is not a keyword.", line);
         },
         ErrorType::ExpectedParameterName { line } => {
-            println!("Line {}: expected parameter name after a comma in function declaration.", line);
+            println!("Line {}: expected parameter name in function declaration.", line);
         },
         ErrorType::ExpectedVariableName { line } => {
             println!("Line {}: expected variable name. Make sure it is not a keyword.", line);
