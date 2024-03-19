@@ -661,6 +661,7 @@ impl Interpreter {
     }
 }
 
+/// Sorts the given array using merge sort.
 fn merge_sort(array_to_sort: &Vec<Value>, line: usize) -> Result<Vec<Value>, ErrorType> {
     let n = array_to_sort.len();
 
