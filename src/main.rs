@@ -44,7 +44,7 @@ fn run_file(file_path: &str) {
     run(&source, &mut interpreter);
 }
 
-/// Runs the interactive REPL interfae in the console.
+/// Runs the interactive REPL interface in the console.
 fn run_repl() {
     // We need the same `Interpreter` instance across all REPL source code inputs to preserve the variables and functions stored in the environment.
     let mut interpreter = Interpreter::new();
