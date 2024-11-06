@@ -8,7 +8,7 @@ All components are hand-written, including the lexer and the parser. It is rough
 - functions (and recursion), and
 - built-in functions.
 
-It is also written in Rust, so much of the original Java logic and structure has been redesigned.
+It is also written in Rust, so much of the original Java logic and structure have been redesigned.
 
 To use the interpreter, first build the project using Cargo. Then, either:
 
