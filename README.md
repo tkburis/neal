@@ -47,12 +47,12 @@ for (var x = 2; x < n; x = x + 1) {
             }
         }
         if (prime) {
-            append(prime_factors, x)
+            append(prime_factors, x)  # `append` is built-in
         }
     }
 }
 
-print sort(prime_factors)  # `sorted` is built-in
+print sort(prime_factors)  # `sort` is built-in
 ```
 
 - Solve the Tower of Hanoi puzzle
