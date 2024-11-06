@@ -6,7 +6,7 @@ All components are hand-written, including the lexer and the parser. It is rough
 - arrays,
 - dictionaries,
 - functions (and recursion), and
-- built-in functions
+- built-in functions.
 
 It is also written in Rust, so much of the original Java logic and structure has been redesigned.
 
