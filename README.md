@@ -1,7 +1,7 @@
 ## Overview
 This is an interpreter for a custom programming language.
 
-All components are hand-written, including the lexer and the parser. It is roughly based on the interpreter presented in Nystrom's [Crafting Interpreters](https://craftinginterpreters.com/), but with additional support for
+All components are hand-written, including the lexer and the parser. It is roughly based on the tree-walk interpreter presented in Nystrom's [Crafting Interpreters](https://craftinginterpreters.com/), but with additional support for
 
 - arrays,
 - dictionaries,
