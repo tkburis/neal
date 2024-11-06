@@ -51,6 +51,7 @@ for (var x = 2; x < n; x = x + 1) {
         }
     }
 }
+
 print sort(prime_factors)  # `sorted` is built-in
 ```
 
